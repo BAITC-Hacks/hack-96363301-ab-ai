@@ -8,7 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist НЕ игнорируется намеренно: собранный фронтенд коммитится,
+# чтобы проверяющему хватило одной команды запуска. См. README, раздел 7.
 dist-ssr
 *.local
 

@@ -19,6 +19,18 @@ const DEMO_SET = {
   after: { file: 'polozhenie_red9_after.docx', name: 'Положение о внутреннем аудите, редакция 9 (после)' },
 };
 
+/**
+ * Имя файла в multipart приходит байтами UTF-8, которые multer по стандарту
+ * RFC 7578 трактует как latin1. Русские имена превращаются в «ÐŸÐ¾Ð»Ð¾Ð¶...».
+ * Возвращаем байты обратно и читаем как UTF-8; если имя было чистым ASCII,
+ * преобразование ничего не меняет.
+ */
+function decodeFileName(name) {
+  if (!name) return name;
+  const decoded = Buffer.from(name, 'latin1').toString('utf8');
+  return decoded.includes('�') ? name : decoded;
+}
+
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -64,9 +76,9 @@ app.post('/api/analyze', upload.fields([{ name: 'before', maxCount: 1 }, { name:
   try {
     const report = await analyze({
       beforeBuffer: before.buffer,
-      beforeName: before.originalname,
+      beforeName: decodeFileName(before.originalname),
       afterBuffer: after.buffer,
-      afterName: after.originalname,
+      afterName: decodeFileName(after.originalname),
     });
     res.json(report);
   } catch (err) {
