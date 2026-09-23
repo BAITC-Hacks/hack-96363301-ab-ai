@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import ExcelJS from 'exceljs';
+const appUrl = process.env.ORGDIFF_TEST_URL || 'http://localhost:3000';
 const target = await (await fetch('http://127.0.0.1:9333/json/new?about:blank', { method: 'PUT' })).json();
 const socket = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
@@ -11,11 +12,13 @@ const pending = new Map();
 const errors = [];
 let exportStatus = null;
 let uploadResponse = null;
+let exampleResponse = null;
 socket.onmessage = ({ data }) => {
   const message = JSON.parse(data);
   if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.text);
   if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/api/plan/export')) exportStatus = message.params.response.status;
   if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/api/analyze')) uploadResponse = { requestId: message.params.requestId, status: message.params.response.status };
+  if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/api/analyze/example')) exampleResponse = { requestId: message.params.requestId, status: message.params.response.status };
   const callback = pending.get(message.id);
   if (callback) { pending.delete(message.id); message.error ? callback.reject(message.error) : callback.resolve(message.result); }
 };
@@ -44,15 +47,22 @@ try {
   await send('Network.enable');
   await send('Browser.setDownloadBehavior', { behavior: 'deny' });
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
-  await send('Page.navigate', { url: 'http://localhost:3000/' });
-  await until(`location.origin === 'http://localhost:3000' && [...document.querySelectorAll('button')].some(b => b.textContent.includes('Проверить учебный пример'))`);
+  await send('Page.navigate', { url: appUrl });
+  await until(`location.origin === ${JSON.stringify(new URL(appUrl).origin)} && [...document.querySelectorAll('button')].some(b => b.textContent.includes('Проверить учебный пример'))`);
   await evaluate(`Object.keys(localStorage).filter(k => k.startsWith('orgdiff.plan.')).forEach(k => localStorage.removeItem(k))`);
   await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Проверить учебный пример')).click()`);
   await until(`!!document.querySelector('[aria-label="Краткие итоги"]')`);
   assert.ok(await evaluate(`!!document.querySelector('[aria-label="Полнота анализа"]')`));
   assert.equal(await evaluate(`document.querySelectorAll('#functions tbody tr').length`), 4);
   assert.equal(await evaluate(`document.querySelector('#trace').open`), false);
-  assert.ok(await evaluate(`document.querySelector('#trace').textContent.includes('ответов модели: 0 (API: 0)')`));
+  assert.equal(exampleResponse?.status, 200);
+  const exampleBody = await send('Network.getResponseBody', { requestId: exampleResponse.requestId });
+  const exampleReport = JSON.parse(exampleBody.base64Encoded ? Buffer.from(exampleBody.body, 'base64').toString('utf8') : exampleBody.body);
+  const answers = exampleReport.trace.filter(step => step.kind === 'llm' && ['api', 'fixture'].includes(step.source));
+  const liveAnswers = answers.filter(step => step.source === 'api').length;
+  const expectedTrace = `ответов модели: ${answers.length} (API: ${liveAnswers})`;
+  assert.equal(exampleReport.meta.mode, liveAnswers ? 'live' : 'demo');
+  assert.ok(await evaluate(`document.querySelector('#trace').textContent.includes(${JSON.stringify(expectedTrace)})`));
   await until(`document.querySelector('[aria-label="Прогресс рассмотрения"]')?.textContent.includes('Находок')`);
   await evaluate(`document.querySelector('#reorganization-lab svg [role="button"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
   assert.ok(await evaluate(`document.querySelector('#map-panel').textContent.includes('Проверить переход по источникам')`));
