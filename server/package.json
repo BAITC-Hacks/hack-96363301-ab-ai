@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --test",
-    "verify": "node scripts/verify.js"
+    "verify": "node scripts/verify.js",
+    "check:openai": "node scripts/check-openai.js"
   },
   "keywords": [],
   "author": "",
