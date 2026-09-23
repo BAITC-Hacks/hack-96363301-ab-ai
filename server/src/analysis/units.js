@@ -15,9 +15,10 @@
  * функций» — это первое, что заметил бы проверяющий эксперт.
  */
 
-const UNIT_LIST_RE = /^3\.4[а-яё]$/u;
-const OWNER_HEADER_RE = /^5\.\d+$/u;
-const ORG_FUNCTIONS_RE = /^2\.4(\.\d+)*[а-яё]?$/u;
+const UNIT_NAME_RE = /^(департамент|управление|отдел|служба|бюро)\s/iu;
+const OWNER_HEADER_RE = /^(директор|начальник|руководитель|функции\s+(департамента|отдела|управления))/iu;
+const ORG_FUNCTIONS_RE = /осуществляет следующие функции|функции (организации|общества|блока)|^функции:?$/iu;
+const childOf = (number, parent) => number !== parent && (number.startsWith(`${parent}.`) || new RegExp(`^${parent.replace(/\./g, '\\.')}[а-яё]$`, 'u').test(number));
 /** «Директоры департаментов обязаны…» — заголовок, общий для всех департаментов. */
 const GENERIC_OWNER_RE = /директор[ыао]*\s+департаментов/iu;
 
@@ -50,9 +51,11 @@ function nameKeywords(name) {
  * @returns {Array<{name: string, abbr: string|null, ref: string}>}
  */
 export function extractUnits(doc) {
+  const seen = new Set();
   return doc.clauses
-    .filter((c) => c.number && UNIT_LIST_RE.test(c.number))
-    .map((c) => ({ ...parseUnitName(c.text), ref: c.id, number: c.number }));
+    .filter((c) => c.unitDefinition || (UNIT_NAME_RE.test(c.text) && c.text.length < 250 && !/[;:]|обязан|осуществля|выполня/iu.test(c.text)))
+    .map((c) => ({ ...parseUnitName(c.unitDefinition || c.text), ref: c.id, number: c.number }))
+    .filter((u) => { const key = normalizeText(u.name); if (seen.has(key)) return false; seen.add(key); return true; });
 }
 
 /**
@@ -66,7 +69,7 @@ export function extractUnits(doc) {
 export function extractOwners(doc, units) {
   const owners = new Map();
 
-  for (const header of doc.clauses.filter((c) => c.number && OWNER_HEADER_RE.test(c.number))) {
+  for (const header of doc.clauses.filter((c) => c.number && OWNER_HEADER_RE.test(c.text) && !/;|подчиня|штатн|должност[еьи]/iu.test(c.text))) {
     const norm = normalizeText(header.text);
     const matched = units.filter((u) => {
       // \b в JavaScript опирается на ASCII-\w и с кириллицей не работает:
@@ -109,6 +112,7 @@ export function extractOwners(doc, units) {
  */
 export function extractFunctions(doc, units) {
   const owners = extractOwners(doc, units);
+  const orgHeaders = doc.clauses.filter((c) => c.number && ORG_FUNCTIONS_RE.test(c.text));
   const out = [];
 
   for (const clause of doc.clauses) {
@@ -118,7 +122,13 @@ export function extractFunctions(doc, units) {
     // (в редакции 8 встречается пустой пункт «5.5.3. ;»).
     const meaningful = clause.text.replace(/[^а-яёa-z]/giu, '').length > 25;
 
-    if (ORG_FUNCTIONS_RE.test(clause.number)) {
+    if (clause.functionOwner) {
+      const unit = units.find((u) => normalizeText(u.name) === normalizeText(parseUnitName(clause.functionOwner).name));
+      out.push({ ref: clause.id, number: clause.number, docId: clause.docId, text: clause.text,
+        owner: unit?.abbr || clause.functionOwner, ownerTitle: clause.functionOwner, scope: 'unit' });
+      continue;
+    }
+    if (orgHeaders.some((h) => childOf(clause.number, h.number))) {
       if (!meaningful) continue;
       out.push({
         ref: clause.id,
@@ -132,7 +142,7 @@ export function extractFunctions(doc, units) {
       continue;
     }
 
-    const headerNumber = clause.number.match(/^(5\.\d+)\./u)?.[1];
+    const headerNumber = [...owners.keys()].filter((n) => childOf(clause.number, n)).sort((a, b) => b.length - a.length)[0];
     if (!headerNumber) continue;
     const owner = owners.get(headerNumber);
     if (!owner || owner.units.length === 0) continue;
@@ -163,6 +173,7 @@ export function diffUnits(unitsBefore, unitsAfter, clauseIndex) {
   const beforeMap = new Map(unitsBefore.map((u) => [key(u), u]));
   const afterMap = new Map(unitsAfter.map((u) => [key(u), u]));
   const result = [];
+  const consumed = new Set();
 
   // Текст цитаты берётся из индекса парсера, а не пересобирается здесь:
   // источник истины для формулировки — всегда исходный документ.
@@ -178,20 +189,30 @@ export function diffUnits(unitsBefore, unitsAfter, clauseIndex) {
   };
 
   for (const [k, after] of afterMap) {
-    const before = beforeMap.get(k);
+    let before = beforeMap.get(k) || unitsBefore.find((u) => normalizeText(u.name) === normalizeText(after.name));
+    // Переименование/слияние/разделение подтверждается отдельным распорядительным пунктом.
+    const mentions = (text, u) => normalizeText(text).includes(normalizeText(u.name)) ||
+      (u.abbr && normalizeText(text).split(' ').includes(u.abbr.toLowerCase()));
+    const orders = [...(clauseIndex?.values() || [])].filter((c) => c.docId === after.ref.split('#')[0] &&
+      /переименова|реорганизова|преобразова|объедини|раздели|слияни/iu.test(c.text) && mentions(c.text, after));
+    const predecessors = unitsBefore.filter((u) => orders.some((c) => mentions(c.text, u)));
+    if (!before && predecessors.length) before = predecessors[0];
+    const reorganized = Boolean(before && (normalizeText(before.name) !== normalizeText(after.name) || before.abbr !== after.abbr || predecessors.length));
+    if (before) consumed.add(key(before));
+    predecessors.forEach((u) => consumed.add(key(u)));
     result.push({
       name: after.name,
       abbr: after.abbr,
-      status: before ? 'kept' : 'created',
-      evidence: [cite(before), cite(after)].filter(Boolean),
-      note: before
+      status: reorganized ? 'reorganized' : before ? 'kept' : 'created',
+      evidence: [...new Map([cite(before), cite(after), ...predecessors.map(cite), ...orders.map((c) => ({ref:c.id, docId:c.docId, number:c.number, text:c.text}))].filter(Boolean).map((e) => [e.ref, e])).values()],
+      note: reorganized ? `Изменение подразделения: ${[...new Set([before, ...predecessors].map((u) => u.name))].join(', ')} → ${after.name}.` : before
         ? null
         : 'Подразделение отсутствует в редакции «до» — создано при реорганизации.',
     });
   }
 
   for (const [k, before] of beforeMap) {
-    if (afterMap.has(k)) continue;
+    if (afterMap.has(k) || consumed.has(k)) continue;
     result.push({
       name: before.name,
       abbr: before.abbr,

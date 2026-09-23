@@ -3,7 +3,7 @@ import type { Evidence } from '../types'
 /** Ярлык документа: red8 → «ред. 8». */
 function docLabel(docId: string): string {
   const m = /^red(\d+)$/.exec(docId)
-  return m ? `ред. ${m[1]}` : docId
+  return m ? (m[1] === '8' ? 'Документ «до»' : 'Документ «после»') : docId
 }
 
 function docTone(docId: string): string {

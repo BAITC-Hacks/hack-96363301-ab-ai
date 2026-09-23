@@ -19,9 +19,9 @@ function FileZone({
   function take(list: FileList | null) {
     const f = list && list.length > 0 ? list[0] : null
     if (!f) return
-    if (!/\.docx$/i.test(f.name)) {
+    if (!/\.(docx|pdf|xlsx)$/i.test(f.name)) {
       onPick(null)
-      window.alert(`Ожидается файл .docx, получен «${f.name}».`)
+      window.alert(`Ожидается DOCX, PDF или XLSX, получен «${f.name}».`)
       return
     }
     onPick(f)
@@ -53,7 +53,7 @@ function FileZone({
           onClick={() => inputRef.current?.click()}
           className="border border-slate-400 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed"
         >
-          Выбрать .docx
+          Выбрать файл
         </button>
         {file ? (
           <>
@@ -77,7 +77,7 @@ function FileZone({
       <input
         ref={inputRef}
         type="file"
-        accept=".docx"
+        accept=".docx,.pdf,.xlsx"
         className="hidden"
         onChange={(e) => {
           take(e.target.files)
@@ -115,7 +115,7 @@ export function UploadPanel({
       <header className="border-b border-slate-300 bg-slate-50 px-4 py-2.5">
         <h2 className="text-base font-semibold text-slate-900">Комплект документов для сравнения</h2>
         <p className="mt-0.5 text-xs text-slate-600">
-          Положения о подразделениях, приложения к распорядительным документам, оргструктуры. Формат — .docx.
+          DOCX, текстовый PDF или XLSX со столбцами «Подразделение» и «Функция». До 20 МБ на файл.
         </p>
       </header>
 
@@ -155,7 +155,7 @@ export function UploadPanel({
           </button>
           <p className="text-[11px] leading-snug text-slate-300">
             Контрольный комплект организатора: «Положение о внутреннем аудите», редакция 8 → редакция 9.
-            Работает без API-ключа — ответы модели воспроизводятся из записанных фикстур.
+            Работает без API-ключа: анализ и заключение рассчитываются по документам.
           </p>
         </div>
       </div>

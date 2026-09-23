@@ -12,7 +12,7 @@ import { z } from 'zod';
  */
 
 /** Ссылка на пункт документа: `red9#5.3.3` или `red8#3.4а`. */
-export const ClauseRef = z.string().regex(/^red\d+#[\d.]+[а-яё]?$/u, 'ожидается ссылка вида red9#5.3.3');
+export const ClauseRef = z.string().regex(/^red\d+#[a-z\d.]+[а-яё]?$/u, 'ожидается идентификатор пункта или строки');
 
 /** Подтверждённая цитата — собирается на бэкенде из парсера. */
 export const Evidence = z.object({
@@ -82,7 +82,7 @@ export const TraceStep = z.object({
   step: z.string(),
   kind: z.enum(['deterministic', 'llm']),
   model: z.string().nullable(),
-  source: z.enum(['api', 'fixture']),
+  source: z.enum(['api', 'fixture', 'local', 'none']),
   durationMs: z.number(),
   inputSize: z.number().nullable(),
   /** Сколько ссылок модель вернула и сколько из них прошли проверку. */
@@ -107,7 +107,9 @@ export const AnalysisReport = z.object({
   conclusion: z.object({
     summary: z.string(),
     findings: z.array(z.string()),
+    findingEvidence: z.array(z.array(Evidence)),
     recommendations: z.array(z.string()),
+    recommendationEvidence: z.array(z.array(Evidence)),
     disclaimer: z.string(),
   }),
   trace: z.array(TraceStep),

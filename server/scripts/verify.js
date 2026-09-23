@@ -34,6 +34,10 @@ const refsOf = (item) => [
 
 function runCheck(check, report, clauseIndex) {
   switch (check.type) {
+    case 'not-conflict': {
+      const bad = report.conflicts.some((c) => refsOf(c).includes(check.ref));
+      return { ok: !bad, detail: bad ? 'ложный конфликт' : 'декларирование не посчитано конфликтом' };
+    }
     case 'unit': {
       const unit = report.units.find((u) => u.abbr === check.abbr);
       if (!unit) return { ok: false, detail: `подразделение ${check.abbr} не найдено` };
@@ -102,7 +106,9 @@ function runCheck(check, report, clauseIndex) {
     }
 
     case 'citations-valid': {
-      const all = [...report.units, ...report.functions, ...report.duplicates, ...report.conflicts, ...report.gaps];
+      const all = [...report.units, ...report.functions, ...report.duplicates, ...report.conflicts, ...report.gaps,
+        ...report.conclusion.findingEvidence.map((evidence) => ({ evidence })),
+        ...report.conclusion.recommendationEvidence.map((evidence) => ({ evidence }))];
       let checked = 0;
       for (const item of all) {
         const evidence = [...(item.evidenceBefore || []), ...(item.evidenceAfter || []), ...(item.evidence || [])];

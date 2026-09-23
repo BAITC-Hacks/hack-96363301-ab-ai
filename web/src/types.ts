@@ -72,7 +72,7 @@ export interface TraceStep {
   step: string
   kind: 'deterministic' | 'llm'
   model: string | null
-  source: 'api' | 'fixture'
+  source: 'api' | 'fixture' | 'local' | 'none'
   durationMs: number
   inputSize: number | null
   /** Сколько ссылок модель вернула и сколько из них прошли проверку. */
@@ -103,7 +103,9 @@ export interface AnalysisReport {
   conclusion: {
     summary: string
     findings: string[]
+    findingEvidence: Evidence[][]
     recommendations: string[]
+    recommendationEvidence: Evidence[][]
     disclaimer: string
   }
   trace: TraceStep[]

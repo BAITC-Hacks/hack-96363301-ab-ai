@@ -6,13 +6,11 @@ export function ModeBanner({ mode }: { mode: 'live' | 'demo' }) {
     return (
       <div className="border-l-4 border-amber-500 bg-amber-100 px-4 py-2.5">
         <div className="text-sm font-bold text-amber-900">
-          Демо-режим: ответы модели воспроизведены из записанных фикстур, API-ключ не требуется
+          Анализ по документам без живого ответа модели
         </div>
         <p className="mt-0.5 text-xs text-amber-900">
-          Переменная <code className="bg-amber-200 px-1 font-mono">OPENAI_API_KEY</code> не задана. Детерминированные
-          шаги (парсинг .docx, сопоставление пунктов, валидация ссылок) выполняются по-настоящему; ответы LLM берутся
-          из <code className="bg-amber-200 px-1 font-mono">fixtures/*.json</code>. С ключом тот же путь идёт вживую —
-          см. колонку «источник» в трассировке.
+          Анализ и заключение рассчитаны по загруженным документам. Живой ответ модели не использован.
+          Доступность проверки моделью указана в трассировке.
         </p>
       </div>
     )
@@ -68,7 +66,7 @@ export function MetaBar({ meta }: { meta: AnalysisReport['meta'] }) {
         <div className="text-[11px] tracking-wide text-slate-500 uppercase">Отчёт сформирован</div>
         <div className="font-medium text-slate-900">{when}</div>
         <div className="font-mono text-xs text-slate-600">
-          режим: {meta.mode === 'demo' ? 'demo (фикстуры)' : 'live (API)'}
+          режим: {meta.mode === 'demo' ? 'локальный анализ' : 'live (API)'}
         </div>
       </div>
     </div>

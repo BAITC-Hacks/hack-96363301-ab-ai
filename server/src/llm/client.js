@@ -34,9 +34,10 @@ export function fixtureKey(name, payload) {
   return `${name}.${hash}`;
 }
 
-async function readFixture(key) {
+async function readFixture(key, validator) {
   try {
-    return JSON.parse(await readFile(join(FIXTURES_DIR, `${key}.json`), 'utf8'));
+    const parsed = validator.safeParse(JSON.parse(await readFile(join(FIXTURES_DIR, `${key}.json`), 'utf8')));
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
@@ -49,7 +50,7 @@ async function writeFixture(key, data) {
 
 let client = null;
 function getClient() {
-  if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 45000, maxRetries: 0 });
   return client;
 }
 
@@ -69,7 +70,7 @@ export async function callModel({ name, system, user, schema, validator }) {
   const started = Date.now();
 
   if (!hasApiKey()) {
-    const fixture = await readFixture(key);
+    const fixture = await readFixture(key, validator);
     return {
       data: fixture,
       source: fixture ? 'fixture' : 'none',
@@ -106,7 +107,7 @@ export async function callModel({ name, system, user, schema, validator }) {
     return { data: parsed.data, source: 'api', durationMs: Date.now() - started, error: null };
   } catch (err) {
     // Сеть, лимит, неверный ключ — не роняем пайплайн, деградируем.
-    const fixture = await readFixture(key);
+    const fixture = await readFixture(key, validator);
     return {
       data: fixture,
       source: fixture ? 'fixture' : 'none',

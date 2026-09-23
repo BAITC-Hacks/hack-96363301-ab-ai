@@ -8,6 +8,7 @@ import cors from 'cors';
 import multer from 'multer';
 
 import { analyze, hasApiKey } from './pipeline.js';
+import { decodeFileName } from './parse/document.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..');
@@ -15,8 +16,8 @@ const DATA_DIR = join(repoRoot, 'data');
 const WEB_DIST = join(repoRoot, 'web', 'dist');
 
 const DEMO_SET = {
-  before: { file: 'polozhenie_red8_before.docx', name: 'Положение о внутреннем аудите, редакция 8 (до)' },
-  after: { file: 'polozhenie_red9_after.docx', name: 'Положение о внутреннем аудите, редакция 9 (после)' },
+  before: { file: 'polozhenie_red8_before.docx', name: 'Положение о внутреннем аудите, редакция 8 (до).docx' },
+  after: { file: 'polozhenie_red9_after.docx', name: 'Положение о внутреннем аудите, редакция 9 (после).docx' },
 };
 
 /**
@@ -25,13 +26,7 @@ const DEMO_SET = {
  * Возвращаем байты обратно и читаем как UTF-8; если имя было чистым ASCII,
  * преобразование ничего не меняет.
  */
-function decodeFileName(name) {
-  if (!name) return name;
-  const decoded = Buffer.from(name, 'latin1').toString('utf8');
-  return decoded.includes('�') ? name : decoded;
-}
-
-const app = express();
+export const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 app.use(cors());
@@ -43,8 +38,8 @@ app.get('/api/health', (_req, res) => {
     // Эксперту важно сразу видеть, в каком режиме работает сервер.
     mode: hasApiKey() ? 'live' : 'demo',
     hint: hasApiKey()
-      ? 'API-ключ найден: объяснения генерируются моделью и записываются в fixtures/llm.'
-      : 'API-ключ не задан: работает демо-режим на записанных фикстурах, сценарий проходится полностью.',
+      ? 'API-ключ найден: доступна дополнительная проверка сопоставлений моделью.'
+      : 'API-ключ не задан: анализ и заключение рассчитываются локально по документам.',
   });
 });
 
@@ -69,7 +64,7 @@ app.post('/api/analyze', upload.fields([{ name: 'before', maxCount: 1 }, { name:
   const after = req.files?.after?.[0];
 
   if (!before || !after) {
-    res.status(400).json({ error: 'Нужны оба файла: поля before и after (.docx)' });
+    res.status(400).json({ error: 'Нужны оба файла: поля before и after (DOCX, PDF, XLSX)' });
     return;
   }
 
@@ -82,8 +77,12 @@ app.post('/api/analyze', upload.fields([{ name: 'before', maxCount: 1 }, { name:
     });
     res.json(report);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(422).json({ error: err.message });
   }
+});
+
+app.use((err, _req, res, _next) => {
+  res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Максимальный размер файла — 20 МБ.' : err.message });
 });
 
 // Собранный фронтенд отдаётся тем же процессом: одна команда запуска,
@@ -96,6 +95,6 @@ app.get(/^(?!\/api\/).*/, (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) app.listen(PORT, () => {
   console.log(`[orgdiff] http://localhost:${PORT}  режим: ${hasApiKey() ? 'live (есть OPENAI_API_KEY)' : 'demo (фикстуры)'}`);
 });

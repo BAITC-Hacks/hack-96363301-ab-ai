@@ -32,12 +32,17 @@ export default function App() {
   const [result, setResult] = useState<AnalyzeResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [stage, setStage] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   async function run(what: string, fn: () => Promise<AnalyzeResult>) {
     setBusy(true)
+    setError(null)
+    setResult(null)
     setStage(what)
     try {
       setResult(await fn())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить анализ.')
     } finally {
       setBusy(false)
       setStage('')
@@ -80,12 +85,13 @@ export default function App() {
       </div>
 
       {busy ? <Spinner what={stage} /> : null}
+      {error ? <div role="alert" className="mb-4 border border-rose-400 bg-rose-50 p-4 text-rose-900">{error}</div> : null}
 
       {!busy && !report ? (
         <div className="border border-slate-300 bg-white px-6 py-10 text-center">
           <p className="text-sm font-semibold text-slate-900">Отчёт ещё не сформирован</p>
           <p className="mx-auto mt-1 max-w-2xl text-sm text-slate-600">
-            Загрузите два .docx — редакции «до» и «после» — или нажмите
+            Загрузите два документа (DOCX, PDF, XLSX) — редакции «до» и «после» — или нажмите
             <span className="mx-1 font-semibold text-slate-900">«Проанализировать демо-комплект»</span>: агент
             разберёт контрольный комплект организатора и покажет реорганизацию подразделений, перенос и потерю
             функций, дублирование и конфликт интересов — каждый вывод со ссылкой на пункт документа.

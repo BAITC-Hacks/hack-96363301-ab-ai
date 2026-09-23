@@ -81,10 +81,10 @@ export function TracePanel({ trace }: { trace: TraceStep[] }) {
                     title={
                       t.source === 'fixture'
                         ? 'Ответ воспроизведён из записанной фикстуры — API-ключ не нужен'
-                        : 'Живой вызов на бэкенде'
+                        : t.source === 'local' ? 'Расчёт по документам' : t.source === 'none' ? 'Ответ модели не получен' : 'Вызов модели'
                     }
                   >
-                    {t.source === 'fixture' ? 'фикстура' : 'api'}
+                    {{ fixture: 'фикстура', api: 'API', local: 'расчёт', none: 'недоступно' }[t.source]}
                   </span>
                   <span className="ml-auto font-mono text-[11px] text-slate-400">{ms(t.durationMs)}</span>
                 </div>
@@ -108,8 +108,8 @@ export function TracePanel({ trace }: { trace: TraceStep[] }) {
 
       <footer className="border-t border-slate-700 px-3 py-2 text-[11px] leading-snug text-slate-400">
         Текст цитаты и номер пункта подставляет парсер, а не модель. Модель получает только список допустимых
-        идентификаторов пунктов; ссылка вне списка отбрасывается — закрывает п. 9 ТЗ «не формировать утверждения,
-        не подтверждённые документами».
+        идентификаторов пунктов конкретной находки. При неверных или пустых ссылках ответ отклоняется.
+        Свободный текст модели не публикуется.
         {fixtures > 0 ? (
           <span className="mt-1 block text-amber-300">
             Шагов из фикстур: {fixtures} — демо-режим, ключ не требуется.

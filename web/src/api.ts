@@ -1,4 +1,3 @@
-import { mockReport } from './mock-report'
 import type { AnalysisReport } from './types'
 
 export interface AnalyzeResult {
@@ -30,20 +29,22 @@ function looksLikeReport(value: unknown): value is AnalysisReport {
     r.conclusion !== null &&
     typeof r.conclusion.summary === 'string' &&
     Array.isArray(r.conclusion.findings) &&
+    Array.isArray(r.conclusion.findingEvidence) &&
     Array.isArray(r.conclusion.recommendations) &&
+    Array.isArray(r.conclusion.recommendationEvidence) &&
     typeof r.conclusion.disclaimer === 'string'
   )
 }
 
-function fallback(reason: string): AnalyzeResult {
-  return { report: mockReport, fallback: true, fallbackReason: reason }
+function fallback(reason: string): never {
+  throw new Error(reason)
 }
 
-async function post(body: BodyInit, headers?: HeadersInit): Promise<AnalyzeResult> {
+async function post(body: BodyInit, headers?: HeadersInit, endpoint = ENDPOINT): Promise<AnalyzeResult> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const res = await fetch(ENDPOINT, {
+    const res = await fetch(endpoint, {
       method: 'POST',
       body,
       headers,
@@ -68,7 +69,7 @@ async function post(body: BodyInit, headers?: HeadersInit): Promise<AnalyzeResul
     const reason =
       err instanceof DOMException && err.name === 'AbortError'
         ? 'Бэкенд не ответил за 120 секунд.'
-        : `Бэкенд недоступен (${err instanceof Error ? err.message : 'сетевая ошибка'}).`
+        : (err instanceof Error ? err.message : 'Бэкенд недоступен: сетевая ошибка.')
     return fallback(reason)
   } finally {
     clearTimeout(timer)
@@ -77,7 +78,7 @@ async function post(body: BodyInit, headers?: HeadersInit): Promise<AnalyzeResul
 
 /** Предзагруженный комплект организатора: редакция 8 → редакция 9. */
 export function analyzeDemo(): Promise<AnalyzeResult> {
-  return post(JSON.stringify({ demo: true }), { 'Content-Type': 'application/json' })
+  return post(JSON.stringify({ demo: true }), { 'Content-Type': 'application/json' }, '/api/analyze/demo')
 }
 
 /** Пользовательский комплект: два .docx. */

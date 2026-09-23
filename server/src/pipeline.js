@@ -1,4 +1,5 @@
-import { parseDocx, indexClauses } from './parse/docx.js';
+import { indexClauses } from './parse/docx.js';
+import { parseDocument } from './parse/document.js';
 import { extractUnits, extractFunctions, diffUnits } from './analysis/units.js';
 import { diffFunctions, findDuplicates, findConflicts, findNormativeGaps } from './analysis/diff.js';
 import { explainChanges, buildConclusion, hasApiKey } from './llm/enrich.js';
@@ -21,7 +22,7 @@ export async function analyze({ beforeBuffer, beforeName, afterBuffer, afterName
       step,
       kind,
       model: null,
-      source: 'api',
+      source: 'local',
       durationMs: Date.now() - started,
       inputSize: null,
       citationsReturned: null,
@@ -31,8 +32,8 @@ export async function analyze({ beforeBuffer, beforeName, afterBuffer, afterName
   };
 
   const { before, after, clauseIndex } = await timed('Разбор документов и нумерация пунктов', 'deterministic', async () => {
-    const b = await parseDocx(beforeBuffer, 'red8');
-    const a = await parseDocx(afterBuffer, 'red9');
+    const b = await parseDocument(beforeBuffer, 'red8', beforeName);
+    const a = await parseDocument(afterBuffer, 'red9', afterName);
     return { before: b, after: a, clauseIndex: indexClauses(b, a) };
   });
 
@@ -48,6 +49,9 @@ export async function analyze({ beforeBuffer, beforeName, afterBuffer, afterName
     () => {
       const fb = extractFunctions(before, unitsBefore);
       const fa = extractFunctions(after, unitsAfter);
+      if (!unitsBefore.length || !unitsAfter.length || !fb.length || !fa.length) {
+        throw new Error('Не удалось распознать подразделения и их функции в обоих документах. Нужны названия подразделений и нумерованные блоки функций/обязанностей руководителей; для XLSX — столбцы «Подразделение» и «Функция».');
+      }
       return { functionsBefore: fb, functionsAfter: fa, functions: diffFunctions(fb, fa, clauseIndex) };
     },
   );

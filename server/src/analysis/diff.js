@@ -203,37 +203,14 @@ export function findDuplicates(functions, clauseIndex) {
 /**
  * Потенциальные конфликты интересов (must have 3).
  *
- * Два независимых признака:
- *  1) прямой — в редакции «после» появились пункты про совмещение и
- *     декларирование конфликта интересов, которых не было в «до»;
- *  2) структурный — одно подразделение одновременно и контролирует
- *     качество аудита, и формирует план работ, то есть проверяет то, что
- *     само же и планирует.
+ * Структурный признак: одно подразделение контролирует качество аудита
+ * и формирует план работ. Это основание для проверки независимости,
+ * а не доказательство состоявшегося конфликта.
  */
-export function findConflicts(beforeDoc, afterDoc, functionsAfter, clauseIndex) {
+export function findConflicts(_beforeDoc, _afterDoc, functionsAfter, clauseIndex) {
   const conflicts = [];
 
-  // Признаки конфликта интересов разбросаны по всему документу, а не только
-  // по разделам с функциями: в выданном комплекте они добавлены в раздел 4
-  // «Внутренний аудит в ДЗО». Поэтому сканируем все пункты целиком.
-  const mentionsConflict = (text) => /конфликт[а-яё]*\s+интерес|совмещени|деклараци/iu.test(text);
-
-  const beforeConflictTokens = beforeDoc.clauses.filter((c) => mentionsConflict(c.text)).map((c) => tokens(c.text));
-
-  const added = afterDoc.clauses.filter((c) => {
-    if (!mentionsConflict(c.text)) return false;
-    const t = tokens(c.text);
-    return Math.max(0, ...beforeConflictTokens.map((b) => similarity(b, t))) < MATCH_THRESHOLD;
-  });
-
-  if (added.length) {
-    conflicts.push({
-      title: 'В редакции «после» появились требования о декларировании конфликта интересов',
-      owners: [],
-      evidence: added.slice(0, 4).map((c) => ({ ref: c.id, docId: c.docId, number: c.number, text: c.text })),
-      rationale: null,
-    });
-  }
+  // Новое требование декларирования — мера контроля, а не факт конфликта.
 
   const byOwner = new Map();
   for (const entry of groupByClause(functionsAfter).filter((e) => e.scope === 'unit')) {
@@ -273,6 +250,7 @@ export function findConflicts(beforeDoc, afterDoc, functionsAfter, clauseIndex) 
  */
 export function findNormativeGaps(unitDiff, functionsAfter, clauseIndex) {
   const orgFunctions = functionsAfter.filter((f) => f.scope === 'org');
+  if (!orgFunctions.length) return []; // Нет раздела для проверки, например в таблице функций.
   const gaps = [];
 
   for (const unit of unitDiff.filter((u) => u.status === 'created')) {
@@ -282,12 +260,11 @@ export function findNormativeGaps(unitDiff, functionsAfter, clauseIndex) {
 
     const own = functionsAfter.filter((f) => f.owner === (unit.abbr || unit.name));
     gaps.push({
-      title: `Функции подразделения «${unit.abbr || unit.name}» не закреплены в разделе функций`,
+      title: `Требуется проверить описание функций подразделения «${unit.abbr || unit.name}»`,
       detail:
         `Подразделение создано в редакции «после», однако раздел «Цели, задачи и функции внутреннего аудита» ` +
         `его не упоминает. Функции прослеживаются только через обязанности руководителя ` +
-        `(${own.length} пунктов). При реорганизации это типовой дефект: подразделение существует ` +
-        `организационно, но его задачи нормативно не закреплены.`,
+        `(${own.length} пунктов). Требуется проверить полноту закрепления задач; отсутствие названия в разделе само по себе не доказывает нарушение.`,
       evidence: own.slice(0, 3).map((f) => {
         const clause = clauseIndex.get(f.ref);
         return { ref: f.ref, docId: f.docId, number: f.number, text: clause ? clause.text : f.text };

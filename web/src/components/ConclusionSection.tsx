@@ -1,4 +1,5 @@
 import type { AnalysisReport } from '../types'
+import { EvidenceDisclosure } from './EvidenceDisclosure'
 import { Section } from './Section'
 
 export function ConclusionSection({ conclusion }: { conclusion: AnalysisReport['conclusion'] }) {
@@ -24,7 +25,7 @@ export function ConclusionSection({ conclusion }: { conclusion: AnalysisReport['
             {conclusion.findings.map((f, i) => (
               <li key={i} className="flex gap-2 text-[13px] text-slate-800">
                 <span className="font-mono text-xs font-bold text-slate-500">{String(i + 1).padStart(2, '0')}</span>
-                <span>{f}</span>
+                <div>{f}<EvidenceDisclosure evidence={conclusion.findingEvidence[i] || []} /></div>
               </li>
             ))}
           </ol>
@@ -41,7 +42,7 @@ export function ConclusionSection({ conclusion }: { conclusion: AnalysisReport['
             {conclusion.recommendations.map((r, i) => (
               <li key={i} className="flex gap-2 text-[13px] text-slate-800">
                 <span className="font-mono text-xs font-bold text-emerald-700">R{i + 1}</span>
-                <span>{r}</span>
+                <div>{r}<EvidenceDisclosure evidence={conclusion.recommendationEvidence[i] || []} /></div>
               </li>
             ))}
           </ol>

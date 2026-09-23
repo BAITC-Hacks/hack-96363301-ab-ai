@@ -25,7 +25,7 @@ export function UnitStatusBadge({ status }: { status: UnitStatus }) {
  */
 const FUNCTION_CHANGE: Record<FunctionChange, { label: string; cls: string; bar: string }> = {
   lost: {
-    label: '● Утрачена',
+    label: '● Возможная утрата',
     cls: 'bg-rose-600 text-white ring-rose-700',
     bar: 'border-l-4 border-rose-600',
   },
@@ -51,6 +51,7 @@ const FUNCTION_CHANGE: Record<FunctionChange, { label: string; cls: string; bar:
   },
 }
 
+// eslint-disable-next-line react/only-export-components
 export function functionChangeBar(change: FunctionChange): string {
   return FUNCTION_CHANGE[change]?.bar ?? 'border-l-4 border-slate-200'
 }
