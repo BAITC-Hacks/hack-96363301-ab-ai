@@ -16,14 +16,15 @@ function size(n: number | null): string {
  * отброшено валидатором как неподтверждённые.
  */
 export function TracePanel({ trace }: { trace: TraceStep[] }) {
-  const llm = trace.filter((t) => t.kind === 'llm')
+  const llm = trace.filter((t) => t.kind === 'llm' && (t.source === 'api' || t.source === 'fixture'))
+  const live = llm.filter((t) => t.source === 'api').length
   const total = trace.reduce((a, t) => a + (t.durationMs ?? 0), 0)
   const returned = trace.reduce((a, t) => a + (t.citationsReturned ?? 0), 0)
   const rejected = trace.reduce((a, t) => a + (t.citationsRejected ?? 0), 0)
   const fixtures = llm.filter((t) => t.source === 'fixture').length
 
   return (
-    <aside id="trace" className="border border-slate-800 bg-slate-900 text-slate-200">
+    <aside className="border border-slate-800 bg-slate-900 text-slate-200">
       <header className="border-b border-slate-700 px-3 py-2">
         <h2 className="text-sm font-bold tracking-wide text-white uppercase">Трассировка пайплайна</h2>
         <p className="mt-0.5 text-[11px] text-slate-400">
@@ -36,7 +37,7 @@ export function TracePanel({ trace }: { trace: TraceStep[] }) {
           <dt className="text-[10px] tracking-wide text-slate-400 uppercase">Шагов</dt>
           <dd className="font-mono text-base font-bold text-white">
             {trace.length}
-            <span className="ml-1 text-xs font-normal text-slate-400">из них LLM: {llm.length}</span>
+            <span className="ml-1 text-xs font-normal text-slate-400">ответов модели: {llm.length} (API: {live})</span>
           </dd>
         </div>
         <div className="bg-slate-900 px-2 py-1.5">

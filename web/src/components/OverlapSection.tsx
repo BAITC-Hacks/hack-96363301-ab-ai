@@ -30,14 +30,14 @@ export function OverlapSection({
       subtitle="сопоставление подразделений между собой"
       right={
         <span className="font-mono text-xs text-slate-600">
-          дублирований: {duplicates.length} · конфликтов: {conflicts.length}
+          пересечений: {duplicates.length} · потенциальных конфликтов: {conflicts.length}
         </span>
       }
     >
       <div className="grid gap-4 lg:grid-cols-2">
         <div>
           <h3 className="mb-2 border-b border-amber-400 pb-1 text-sm font-semibold text-slate-900">
-            Дублирование функций
+            Возможное дублирование и совместные обязанности
           </h3>
           {duplicates.length === 0 ? (
             <Empty text="Дублирования функций не обнаружено." />

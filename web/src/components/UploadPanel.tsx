@@ -91,10 +91,12 @@ function FileZone({
 export function UploadPanel({
   busy,
   onDemo,
+  onExample,
   onFiles,
 }: {
   busy: boolean
   onDemo: () => void
+  onExample: () => void
   onFiles: (before: File, after: File) => void
 }) {
   const [before, setBefore] = useState<File | null>(null)
@@ -157,6 +159,11 @@ export function UploadPanel({
             Контрольный комплект организатора: «Положение о внутреннем аудите», редакция 8 → редакция 9.
             Работает без API-ключа: анализ и заключение рассчитываются по документам.
           </p>
+          <button type="button" disabled={busy} onClick={onExample}
+            className="border border-slate-400 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
+            Проверить учебный пример
+          </button>
+          <p className="text-[11px] text-slate-300">Синтетические данные с заранее известными изменениями. Скачать XLSX: <a className="underline" href="/api/examples/before.xlsx">до</a> · <a className="underline" href="/api/examples/after.xlsx">после</a>.</p>
         </div>
       </div>
 

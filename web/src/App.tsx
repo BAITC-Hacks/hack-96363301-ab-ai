@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { analyzeDemo, analyzeFiles } from './api'
+import { useEffect, useState } from 'react'
+import { analyzeDemo, analyzeFiles, analyzeExample } from './api'
 import type { AnalyzeResult } from './api'
 import { FallbackBanner, MetaBar, ModeBanner } from './components/Banners'
 import { ConclusionSection } from './components/ConclusionSection'
@@ -9,8 +9,11 @@ import { OverlapSection } from './components/OverlapSection'
 import { TracePanel } from './components/TracePanel'
 import { UnitsSection } from './components/UnitsSection'
 import { UploadPanel } from './components/UploadPanel'
+import { ReportSummary } from './components/ReportSummary'
+import { ReorganizationLab } from './components/ReorganizationLab'
 
 const NAV = [
+  { id: 'reorganization-lab', label: 'План реорганизации' },
   { id: 'units', label: '01 Подразделения' },
   { id: 'functions', label: '02 Функции' },
   { id: 'overlap', label: '03 Дублирование и КИ' },
@@ -50,6 +53,9 @@ export default function App() {
   }
 
   const report = result?.report ?? null
+  useEffect(() => {
+    if (report) document.getElementById('reorganization-lab')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [report])
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-4">
@@ -76,13 +82,15 @@ export default function App() {
         ) : null}
       </header>
 
-      <div className="mb-4">
+      <details className="mb-4" open={!report || busy}>
+        <summary className={report ? 'rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700' : 'hidden'}>Изменить документы для сравнения</summary>
         <UploadPanel
           busy={busy}
           onDemo={() => void run('Контрольный комплект: редакция 8 → редакция 9', analyzeDemo)}
+          onExample={() => void run('Независимый учебный пример: переименование, перенос, утрата и пересечение функций', analyzeExample)}
           onFiles={(b, a) => void run(`${b.name} → ${a.name}`, () => analyzeFiles(b, a))}
         />
-      </div>
+      </details>
 
       {busy ? <Spinner what={stage} /> : null}
       {error ? <div role="alert" className="mb-4 border border-rose-400 bg-rose-50 p-4 text-rose-900">{error}</div> : null}
@@ -104,8 +112,10 @@ export default function App() {
           <ModeBanner mode={report.meta.mode} />
           {result.fallback && result.fallbackReason ? <FallbackBanner reason={result.fallbackReason} /> : null}
           <MetaBar meta={report.meta} />
+          <ReorganizationLab key={report.meta.reportId || report.meta.generatedAt} report={report} />
+          <ReportSummary report={report} />
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="space-y-4">
             <div className="space-y-4">
               <UnitsSection units={report.units} />
               <FunctionsSection functions={report.functions} />
@@ -114,9 +124,10 @@ export default function App() {
               <ConclusionSection conclusion={report.conclusion} />
             </div>
 
-            <div className="xl:sticky xl:top-4 xl:self-start">
+            <details id="trace" className="border border-slate-300 bg-white">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Технические подробности анализа</summary>
               <TracePanel trace={report.trace} />
-            </div>
+            </details>
           </div>
         </div>
       ) : null}

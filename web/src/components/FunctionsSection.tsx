@@ -7,8 +7,9 @@ import { Empty, Section } from './Section'
 const ORDER: FunctionChange[] = ['lost', 'moved', 'added', 'reworded', 'kept']
 
 export function FunctionsSection({ functions }: { functions: FunctionDiff[] }) {
-  const [filter, setFilter] = useState<FunctionChange | 'all'>('all')
-  const rows = filter === 'all' ? functions : functions.filter((f) => f.change === filter)
+  const [filter, setFilter] = useState<FunctionChange | 'all' | 'changed'>('changed')
+  const rows = (filter === 'all' ? functions : functions.filter((f) => filter === 'changed' ? f.change !== 'kept' : f.change === filter))
+    .slice().sort((a, b) => ORDER.indexOf(a.change) - ORDER.indexOf(b.change))
   const count = (c: FunctionChange) => functions.filter((f) => f.change === c).length
 
   return (
@@ -20,6 +21,10 @@ export function FunctionsSection({ functions }: { functions: FunctionDiff[] }) {
       subtitle="«передана» ≠ «утрачена»: смена владельца не считается потерей"
       right={
         <div className="flex flex-wrap items-center gap-1">
+          <button type="button" onClick={() => setFilter('changed')}
+            className={`border px-2 py-0.5 text-xs ${filter === 'changed' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}>
+            Изменения ({functions.filter((f) => f.change !== 'kept').length})
+          </button>
           <button
             type="button"
             onClick={() => setFilter('all')}
@@ -80,12 +85,22 @@ export function FunctionsSection({ functions }: { functions: FunctionDiff[] }) {
                       { title: 'Документ «после»', items: f.evidenceAfter },
                     ]}
                   />
+                  {!!f.reviewCandidates?.length && (
+                    <details className="mt-2 border-l-2 border-amber-400 pl-2 text-xs text-slate-700">
+                      <summary className="cursor-pointer font-semibold">Похожие пункты для ручной проверки ({f.reviewCandidates.length})</summary>
+                      <p className="my-1">Это кандидаты, а не установленная передача функции. Сравните действие, объект и владельца.</p>
+                      {f.reviewCandidates.map((c) => <div key={c.evidence.ref} className="mt-2">
+                        <span>{c.owner} · сходство текста {Math.round(c.similarity * 100)}%</span>
+                        <EvidenceDisclosure evidence={[c.evidence]} label="Сравнить фрагмент" />
+                      </div>)}
+                    </details>
+                  )}
                 </td>
                 <td className="py-2 pr-3 text-[13px] text-slate-800">
                   {f.ownerBefore ?? <span className="text-slate-400">— отсутствует</span>}
                 </td>
                 <td className="py-2 pr-3 text-[13px] text-slate-800">
-                  {f.ownerAfter ?? <span className="font-semibold text-rose-700">— не закреплена</span>}
+                  {f.ownerAfter ?? <span className="font-semibold text-rose-700">— соответствие не найдено</span>}
                 </td>
                 <td className="py-2">
                   <Similarity value={f.similarity} />

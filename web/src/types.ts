@@ -40,6 +40,7 @@ export interface FunctionDiff {
   similarity: number
   evidenceBefore: Evidence[]
   evidenceAfter: Evidence[]
+  reviewCandidates?: Array<{ evidence: Evidence; similarity: number; owner: string }>
   /** Объяснение от модели; при пустом ключе берётся из фикстур. */
   rationale: string | null
 }
@@ -89,6 +90,7 @@ export interface DocMeta {
 /** Полный отчёт — то, что отдаёт POST /api/analyze и рисует фронтенд. */
 export interface AnalysisReport {
   meta: {
+    reportId?: string
     before: DocMeta
     after: DocMeta
     mode: 'live' | 'demo'
