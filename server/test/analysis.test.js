@@ -21,10 +21,10 @@ const analysis = await (async () => {
   const functionsAfter = extractFunctions(after, unitsAfter);
   return {
     clauseIndex,
-    units: diffUnits(unitsBefore, unitsAfter),
+    units: diffUnits(unitsBefore, unitsAfter, clauseIndex),
     functions: diffFunctions(functionsBefore, functionsAfter, clauseIndex),
     duplicates: findDuplicates(functionsAfter, clauseIndex),
-    gaps: findNormativeGaps(diffUnits(unitsBefore, unitsAfter), functionsAfter, clauseIndex),
+    gaps: findNormativeGaps(diffUnits(unitsBefore, unitsAfter, clauseIndex), functionsAfter, clauseIndex),
   };
 })();
 

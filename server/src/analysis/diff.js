@@ -201,6 +201,70 @@ export function findDuplicates(functions, clauseIndex) {
 }
 
 /**
+ * Потенциальные конфликты интересов (must have 3).
+ *
+ * Два независимых признака:
+ *  1) прямой — в редакции «после» появились пункты про совмещение и
+ *     декларирование конфликта интересов, которых не было в «до»;
+ *  2) структурный — одно подразделение одновременно и контролирует
+ *     качество аудита, и формирует план работ, то есть проверяет то, что
+ *     само же и планирует.
+ */
+export function findConflicts(beforeDoc, afterDoc, functionsAfter, clauseIndex) {
+  const conflicts = [];
+
+  // Признаки конфликта интересов разбросаны по всему документу, а не только
+  // по разделам с функциями: в выданном комплекте они добавлены в раздел 4
+  // «Внутренний аудит в ДЗО». Поэтому сканируем все пункты целиком.
+  const mentionsConflict = (text) => /конфликт[а-яё]*\s+интерес|совмещени|деклараци/iu.test(text);
+
+  const beforeConflictTokens = beforeDoc.clauses.filter((c) => mentionsConflict(c.text)).map((c) => tokens(c.text));
+
+  const added = afterDoc.clauses.filter((c) => {
+    if (!mentionsConflict(c.text)) return false;
+    const t = tokens(c.text);
+    return Math.max(0, ...beforeConflictTokens.map((b) => similarity(b, t))) < MATCH_THRESHOLD;
+  });
+
+  if (added.length) {
+    conflicts.push({
+      title: 'В редакции «после» появились требования о декларировании конфликта интересов',
+      owners: [],
+      evidence: added.slice(0, 4).map((c) => ({ ref: c.id, docId: c.docId, number: c.number, text: c.text })),
+      rationale: null,
+    });
+  }
+
+  const byOwner = new Map();
+  for (const entry of groupByClause(functionsAfter).filter((e) => e.scope === 'unit')) {
+    for (const owner of entry.owners) {
+      if (!byOwner.has(owner)) byOwner.set(owner, []);
+      byOwner.get(owner).push(entry);
+    }
+  }
+
+  // Внимание: \w в JavaScript опирается на ASCII и кириллицу не покрывает —
+  // /контрол\w* качества/ не находит «контроль качества». Классы явные.
+  const CONTROLS_RE = /контрол[а-яё]* качества/iu;
+  const PLANS_RE = /(формир[а-яё]*|консолидир[а-яё]*)[^.;]*план[а-яё]* работ/iu;
+
+  for (const [owner, entries] of byOwner) {
+    const controls = entries.filter((e) => CONTROLS_RE.test(e.text));
+    const plans = entries.filter((e) => PLANS_RE.test(e.text));
+    if (controls.length === 0 || plans.length === 0) continue;
+
+    conflicts.push({
+      title: `Совмещение контрольной и планирующей функций у подразделения «${owner}»`,
+      owners: [owner],
+      evidence: [...controls.slice(0, 1), ...plans.slice(0, 1)].flatMap((e) => evidence(e, clauseIndex)),
+      rationale: null,
+    });
+  }
+
+  return conflicts;
+}
+
+/**
  * Пробелы нормативного закрепления — находка сверх обязательных требований.
  *
  * Подразделение создано в редакции «после», но в разделе «Цели, задачи и

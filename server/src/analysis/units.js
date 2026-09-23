@@ -158,11 +158,24 @@ export function extractFunctions(doc, units) {
  * Сопоставление подразделений между редакциями (must have 1).
  * Только по аббревиатуре и названию — см. комментарий в шапке файла.
  */
-export function diffUnits(unitsBefore, unitsAfter) {
+export function diffUnits(unitsBefore, unitsAfter, clauseIndex) {
   const key = (u) => (u.abbr ? u.abbr.toLowerCase() : normalizeText(u.name));
   const beforeMap = new Map(unitsBefore.map((u) => [key(u), u]));
   const afterMap = new Map(unitsAfter.map((u) => [key(u), u]));
   const result = [];
+
+  // Текст цитаты берётся из индекса парсера, а не пересобирается здесь:
+  // источник истины для формулировки — всегда исходный документ.
+  const cite = (unit) => {
+    if (!unit) return null;
+    const clause = clauseIndex?.get(unit.ref);
+    return {
+      ref: unit.ref,
+      docId: unit.ref.split('#')[0],
+      number: unit.number,
+      text: clause ? clause.text : unit.name,
+    };
+  };
 
   for (const [k, after] of afterMap) {
     const before = beforeMap.get(k);
@@ -170,7 +183,7 @@ export function diffUnits(unitsBefore, unitsAfter) {
       name: after.name,
       abbr: after.abbr,
       status: before ? 'kept' : 'created',
-      evidence: [before?.ref, after.ref].filter(Boolean),
+      evidence: [cite(before), cite(after)].filter(Boolean),
       note: before
         ? null
         : 'Подразделение отсутствует в редакции «до» — создано при реорганизации.',
@@ -183,7 +196,7 @@ export function diffUnits(unitsBefore, unitsAfter) {
       name: before.name,
       abbr: before.abbr,
       status: 'removed',
-      evidence: [before.ref],
+      evidence: [cite(before)],
       note: 'Подразделение отсутствует в редакции «после».',
     });
   }
