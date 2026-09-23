@@ -11,6 +11,7 @@ export const ACTIONS = {
   escalate: 'Передать на согласование', dismiss: 'Отклонить находку',
 };
 const OPTIONS = {
+  material: ['escalate', 'dismiss'],
   lost: ['assign', 'escalate', 'dismiss'], duplicate: ['assign', 'accept', 'escalate', 'dismiss'],
   conflict: ['escalate', 'dismiss'], gap: ['assign', 'escalate', 'dismiss'], moved: ['confirm', 'escalate', 'dismiss'],
 };
@@ -50,6 +51,8 @@ export function buildCases(report) {
     cases.push({ id: `${kind}-${digest([title, refs.map((e) => e.ref)]).slice(0, 20)}`, kind, title,
       evidence: refs, candidates, currentOwners, actions: OPTIONS[kind] });
   };
+  for (const f of report.functions.filter((f) => f.materialChanges?.length))
+    add('material', `${f.materialChanges.map((s) => s.title).join('; ')}: ${f.text}`, [...f.evidenceBefore, ...f.evidenceAfter], [], [...new Set([f.ownerBefore, f.ownerAfter].filter(Boolean))]);
   for (const f of report.functions.filter((f) => f.change === 'lost'))
     add('lost', f.text, f.evidenceBefore, f.reviewCandidates || [], f.ownerBefore ? [f.ownerBefore] : []);
   for (const c of report.conflicts) add('conflict', c.title, c.evidence, [], c.owners);
@@ -75,6 +78,8 @@ export function buildPlan(report, decisions = []) {
     if (!d.refs.length || d.refs.some((r) => !allowed.has(r))) throw new Error('Решение ссылается на источник вне выбранной находки.');
     if (d.action === 'confirm' && !['red8', 'red9'].every((docId) => d.refs.some((r) => r.startsWith(`${docId}#`))))
       throw new Error('Для подтверждения передачи выберите источники обеих редакций.');
+    if (item.kind === 'material' && !['red8', 'red9'].every((docId) => d.refs.some((r) => r.startsWith(`${docId}#`))))
+      throw new Error('Для контрпроверки выберите источники обеих редакций.');
     if (d.note.trim().length < 10) throw new Error('Добавьте содержательное обоснование решения.');
     let proposal = null;
     if (d.action === 'assign') proposal = item.kind === 'gap'
@@ -85,7 +90,7 @@ export function buildPlan(report, decisions = []) {
   const escalated = checked.filter((d) => d.action === 'escalate').length;
   return {
     fingerprint: digest({ before: report.meta.before, after: report.meta.after, cases, owners,
-      functions: report.functions.map((f) => [f.change, f.ownerBefore, f.ownerAfter, f.evidenceBefore, f.evidenceAfter]) }),
+      functions: report.functions.map((f) => [f.change, f.ownerBefore, f.ownerAfter, f.evidenceBefore, f.evidenceAfter, f.materialChanges || []]) }),
     cases, owners, decisions: checked,
     stats: { total: cases.length, reviewed: checked.length, pending: cases.length - checked.length,
       escalated, unresolved: cases.length - checked.length + escalated, proposed: checked.filter((d) => d.action === 'assign').length },
@@ -123,7 +128,7 @@ export async function exportPlan(report, plan) {
     { header: 'Обоснование', width: 80 }, { header: 'Источники решения', width: 45 },
     { header: 'Открыть первый источник', width: 28 }, { header: 'Проект формулировки', width: 110 },
   ];
-  const labels = { lost: 'Возможная утрата', duplicate: 'Пересечение', conflict: 'Потенциальный конфликт', gap: 'Описание функций', moved: 'Передача' };
+  const labels = { material: 'Контрпроверка формулировки', lost: 'Возможная утрата', duplicate: 'Пересечение', conflict: 'Потенциальный конфликт', gap: 'Описание функций', moved: 'Передача' };
   for (const c of plan.cases) {
     const d = decisions.get(c.id);
     const refs = d?.refs || c.evidence.map((e) => e.ref);
@@ -133,6 +138,17 @@ export async function exportPlan(report, plan) {
   const functions = workbook.addWorksheet('Сопоставление функций');
   functions.columns = [{ header: 'Изменение', width: 25 }, { header: 'Функция', width: 110 }, { header: 'Владелец до', width: 35 }, { header: 'Владелец после', width: 35 }, { header: 'Источники', width: 60 }];
   for (const f of report.functions) functions.addRow([f.change, f.text.slice(0, 32767), f.ownerBefore || '', f.ownerAfter || '', [...f.evidenceBefore, ...f.evidenceAfter].map((e) => e.ref).join(', ')]);
+  const material = report.functions.filter((f) => f.materialChanges?.length);
+  if (material.length) {
+    const checks = workbook.addWorksheet('Контрпроверка');
+    checks.columns = [{ header: 'Изменение', width: 35 }, { header: 'Что проверить', width: 90 },
+      { header: 'Фрагмент до', width: 50 }, { header: 'Фрагмент после', width: 50 },
+      { header: 'Сходство текста (не уверенность)', width: 30 }, { header: 'Источник до', width: 30 }, { header: 'Источник после', width: 30 }];
+    for (const f of material) for (const signal of f.materialChanges) {
+      const link = (e) => e ? { text: e.ref, hyperlink: `#'Источники'!A${sourceRows.get(e.ref)}` } : '';
+      checks.addRow([signal.title, signal.detail, signal.beforeFragment, signal.afterFragment, `${Math.round(f.similarity * 100)}%`, link(f.evidenceBefore[0]), link(f.evidenceAfter[0])]);
+    }
+  }
   workbook.eachSheet((s) => {
     s.views = [{ state: 'frozen', ySplit: 1 }];
     s.autoFilter = { from: { row: 1, column: 1 }, to: { row: s.rowCount, column: s.columnCount } };

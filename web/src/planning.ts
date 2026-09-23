@@ -1,5 +1,5 @@
 import type { Evidence } from './types'
-export type CaseKind = 'lost' | 'duplicate' | 'conflict' | 'gap' | 'moved'
+export type CaseKind = 'material' | 'lost' | 'duplicate' | 'conflict' | 'gap' | 'moved'
 export type Action = 'assign' | 'confirm' | 'accept' | 'escalate' | 'dismiss'
 export interface Decision { caseId: string; action: Action; owner: string; note: string; refs: string[]; proposal?: string | null }
 export interface ReviewCase {
@@ -12,7 +12,7 @@ export interface Plan {
   stats: { total: number; reviewed: number; pending: number; escalated: number; unresolved: number; proposed: number };
   notice: string
 }
-export const CASE_LABELS: Record<CaseKind, string> = { lost: 'Возможная утрата', duplicate: 'Пересечение', conflict: 'Конфликт интересов', gap: 'Описание функций', moved: 'Передача' }
+export const CASE_LABELS: Record<CaseKind, string> = { material: 'Контрпроверка', lost: 'Возможная утрата', duplicate: 'Пересечение', conflict: 'Конфликт интересов', gap: 'Описание функций', moved: 'Передача' }
 export const ACTION_LABELS: Record<Action, string> = { assign: 'Предложить ответственного', confirm: 'Подтвердить передачу', accept: 'Оставить совместное участие', escalate: 'Передать на согласование', dismiss: 'Отклонить находку' }
 
 export async function requestPlan(reportId: string, decisions: Decision[], exporting = false): Promise<Response> {

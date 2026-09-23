@@ -92,11 +92,13 @@ export function UploadPanel({
   busy,
   onDemo,
   onExample,
+  onCountercheck,
   onFiles,
 }: {
   busy: boolean
   onDemo: () => void
   onExample: () => void
+  onCountercheck: () => void
   onFiles: (before: File, after: File) => void
 }) {
   const [before, setBefore] = useState<File | null>(null)
@@ -164,6 +166,11 @@ export function UploadPanel({
             Проверить учебный пример
           </button>
           <p className="text-[11px] text-slate-300">Синтетические данные с заранее известными изменениями. Скачать XLSX: <a className="underline" href="/api/examples/before.xlsx">до</a> · <a className="underline" href="/api/examples/after.xlsx">после</a>.</p>
+          <button type="button" disabled={busy} onClick={onCountercheck}
+            className="mt-1 rounded-lg bg-violet-400 px-3 py-2.5 text-sm font-bold text-violet-950 hover:bg-violet-300 disabled:opacity-50">
+            Найти скрытые изменения
+          </button>
+          <p className="text-[11px] text-slate-300">Одно слово меняет обязанность. Учебный пример для контрпроверки. Скачать XLSX: <a className="underline" href="/api/examples/countercheck/before.xlsx">до</a> · <a className="underline" href="/api/examples/countercheck/after.xlsx">после</a>.</p>
         </div>
       </div>
 

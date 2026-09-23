@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { analyzeDemo, analyzeFiles, analyzeExample } from './api'
+import { analyzeDemo, analyzeFiles, analyzeExample, analyzeCountercheck } from './api'
 import type { AnalyzeResult } from './api'
 import { FallbackBanner, MetaBar, ModeBanner } from './components/Banners'
 import { ConclusionSection } from './components/ConclusionSection'
@@ -88,6 +88,7 @@ export default function App() {
           busy={busy}
           onDemo={() => void run('Контрольный комплект: редакция 8 → редакция 9', analyzeDemo)}
           onExample={() => void run('Независимый учебный пример: переименование, перенос, утрата и пересечение функций', analyzeExample)}
+          onCountercheck={() => void run('Контрпроверка: небольшие изменения формулировок в учебном примере', analyzeCountercheck)}
           onFiles={(b, a) => void run(`${b.name} → ${a.name}`, () => analyzeFiles(b, a))}
         />
       </details>

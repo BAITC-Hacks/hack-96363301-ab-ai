@@ -1,4 +1,5 @@
 import { normalizeText } from './units.js';
+import { inspectMaterialChanges } from './material.js';
 
 /**
  * Сопоставление функций между редакциями и поиск дублирования.
@@ -103,7 +104,11 @@ export function diffFunctions(functionsBefore, functionsAfter, clauseIndex) {
       if (a.scope !== b.scope) continue;
       const score = similarity(b.tokens, a.tokens);
       const ownerOverlap = b.owners.filter((o) => a.owners.includes(o)).length;
-      if (score > bestScore || (score === bestScore && ownerOverlap > bestOwnerOverlap)) {
+      // При равном качестве предпочитаем ещё не сопоставленный пункт. Повторное
+      // использование остаётся допустимым, когда функции действительно объединены.
+      const betterTie = ownerOverlap > bestOwnerOverlap ||
+        (ownerOverlap === bestOwnerOverlap && usedAfter.has(best?.ref) && !usedAfter.has(a.ref));
+      if (score > bestScore || (score === bestScore && betterTie)) {
         bestScore = score;
         best = a;
         bestOwnerOverlap = ownerOverlap;
@@ -130,10 +135,11 @@ export function diffFunctions(functionsBefore, functionsAfter, clauseIndex) {
 
     usedAfter.add(best.ref);
     const sameOwners = b.owners.length === best.owners.length && b.owners.every((o) => best.owners.includes(o));
+    const materialChanges = inspectMaterialChanges(b.text, best.text);
 
     let change;
     if (!sameOwners) change = 'moved';
-    else if (bestScore >= IDENTICAL_THRESHOLD) change = 'kept';
+    else if (bestScore >= IDENTICAL_THRESHOLD && !materialChanges.length) change = 'kept';
     else change = 'reworded';
 
     results.push({
@@ -144,6 +150,7 @@ export function diffFunctions(functionsBefore, functionsAfter, clauseIndex) {
       similarity: Number(bestScore.toFixed(3)),
       evidenceBefore: evidence(b, clauseIndex),
       evidenceAfter: evidence(best, clauseIndex),
+      materialChanges,
       rationale: null,
     });
   }
@@ -176,33 +183,26 @@ export function diffFunctions(functionsBefore, functionsAfter, clauseIndex) {
  */
 export function findDuplicates(functions, clauseIndex) {
   const entries = groupByClause(functions).filter((e) => e.scope === 'unit');
-  const seen = new Set();
   const duplicates = [];
 
   for (let i = 0; i < entries.length; i += 1) {
-    if (seen.has(entries[i].ref)) continue;
-    const group = [entries[i]];
-
     for (let j = i + 1; j < entries.length; j += 1) {
-      if (seen.has(entries[j].ref)) continue;
       if (similarity(entries[i].tokens, entries[j].tokens) < DUPLICATE_THRESHOLD) continue;
-      group.push(entries[j]);
+      const pair = [entries[i], entries[j]];
+      const owners = [...new Set(pair.flatMap((entry) => entry.owners))];
+      if (owners.length < 2) continue;
+
+      // Сходство нетранзитивно: A–B и B–C не означают A–C. Сохраняем каждую
+      // непосредственную пару, чтобы не потерять B–C и не приписать связь A–C.
+      duplicates.push({
+        text: entries[i].text,
+        owners,
+        evidence: [...new Map(pair.flatMap((entry) => evidence(entry, clauseIndex)).map((e) => [e.ref, e])).values()],
+        rationale: pair.some((entry) => /участв|содейств|в зоне|зоне ответственности/iu.test(entry.text))
+          ? 'Формулировка описывает участие или работу в своей зоне ответственности. Это может быть совместная обязанность; избыточное дублирование не установлено. Уточните роли и границы процессов.'
+          : 'Похожие обязанности закреплены в разных пунктах у нескольких подразделений. Проверьте, совпадают ли объекты работы и границы ответственности, прежде чем считать это избыточным дублированием.',
+      });
     }
-
-    if (group.length < 2) continue;
-
-    const owners = [...new Set(group.flatMap((g) => g.owners))];
-    if (owners.length < 2) continue;
-
-    group.forEach((g) => seen.add(g.ref));
-    duplicates.push({
-      text: entries[i].text,
-      owners,
-      evidence: group.flatMap((g) => evidence(g, clauseIndex)),
-      rationale: /участв|содейств|в зоне|зоне ответственности/iu.test(entries[i].text)
-        ? 'Формулировка описывает участие или работу в своей зоне ответственности. Это может быть совместная обязанность; избыточное дублирование не установлено. Уточните роли и границы процессов.'
-        : 'Похожие обязанности закреплены в разных пунктах у нескольких подразделений. Проверьте, совпадают ли объекты работы и границы ответственности, прежде чем считать это избыточным дублированием.',
-    });
   }
 
   return duplicates;
@@ -271,12 +271,14 @@ export function findNormativeGaps(unitDiff, functionsAfter, clauseIndex) {
       title: `Требуется проверить описание функций подразделения «${unit.abbr || unit.name}»`,
       detail:
         `Подразделение создано в редакции «после», однако раздел «Цели, задачи и функции внутреннего аудита» ` +
-        `его не упоминает. Функции прослеживаются только через обязанности руководителя ` +
-        `(${own.length} пунктов). Требуется проверить полноту закрепления задач; отсутствие названия в разделе само по себе не доказывает нарушение.`,
-      evidence: own.slice(0, 3).map((f) => {
+        `его не упоминает. ` + (own.length
+          ? `Функции прослеживаются только через обязанности руководителя (${own.length} пунктов). `
+          : 'В извлечённом перечне не найдены функции этого подразделения. ') +
+        `Требуется проверить полноту закрепления задач; отсутствие названия в разделе само по себе не доказывает нарушение.`,
+      evidence: own.length ? own.slice(0, 3).map((f) => {
         const clause = clauseIndex.get(f.ref);
         return { ref: f.ref, docId: f.docId, number: f.number, text: clause ? clause.text : f.text };
-      }),
+      }) : [...new Map(unit.evidence.map((e) => [e.ref, e])).values()],
     });
   }
 

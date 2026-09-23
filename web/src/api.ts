@@ -85,6 +85,10 @@ export function analyzeExample(): Promise<AnalyzeResult> {
   return post('{}', { 'Content-Type': 'application/json' }, '/api/analyze/example')
 }
 
+export function analyzeCountercheck(): Promise<AnalyzeResult> {
+  return post('{}', { 'Content-Type': 'application/json' }, '/api/analyze/countercheck')
+}
+
 /** Пользовательский комплект: два .docx. */
 export function analyzeFiles(before: File, after: File): Promise<AnalyzeResult> {
   const form = new FormData()

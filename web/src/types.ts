@@ -32,6 +32,14 @@ export interface Unit {
  */
 export type FunctionChange = 'lost' | 'moved' | 'added' | 'reworded' | 'kept'
 
+export interface MaterialChange {
+  kind: 'prohibition' | 'obligation' | 'frequency' | 'scope'
+  title: string
+  detail: string
+  beforeFragment: string
+  afterFragment: string
+}
+
 export interface FunctionDiff {
   change: FunctionChange
   text: string
@@ -40,6 +48,7 @@ export interface FunctionDiff {
   similarity: number
   evidenceBefore: Evidence[]
   evidenceAfter: Evidence[]
+  materialChanges?: MaterialChange[]
   reviewCandidates?: Array<{ evidence: Evidence; similarity: number; owner: string }>
   /** Объяснение от модели; при пустом ключе берётся из фикстур. */
   rationale: string | null

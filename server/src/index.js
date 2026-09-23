@@ -70,7 +70,17 @@ app.post('/api/analyze/example', async (_req, res) => {
 });
 for (const side of ['before', 'after']) {
   app.get(`/api/examples/${side}.xlsx`, (_req, res) => res.download(join(DATA_DIR, `example_${side}.xlsx`)));
+  app.get(`/api/examples/countercheck/${side}.xlsx`, (_req, res) => res.download(join(DATA_DIR, `countercheck_${side}.xlsx`)));
 }
+
+app.post('/api/analyze/countercheck', async (_req, res) => {
+  try {
+    res.json(rememberReport(await analyze({
+      beforeBuffer: await readFile(join(DATA_DIR, 'countercheck_before.xlsx')), beforeName: 'Контрпроверка — учебный пример до.xlsx',
+      afterBuffer: await readFile(join(DATA_DIR, 'countercheck_after.xlsx')), afterName: 'Контрпроверка — учебный пример после.xlsx',
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.post('/api/analyze', upload.fields([{ name: 'before', maxCount: 1 }, { name: 'after', maxCount: 1 }]), async (req, res) => {
   const before = req.files?.before?.[0];

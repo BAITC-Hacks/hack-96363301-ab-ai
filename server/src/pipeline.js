@@ -44,7 +44,7 @@ export async function analyze({ beforeBuffer, beforeName, afterBuffer, afterName
   });
 
   const { functionsBefore, functionsAfter, functions } = await timed(
-    'Привязка функций к владельцам и сопоставление по тексту',
+    'Сопоставление функций и контрпроверка изменённых формулировок',
     'deterministic',
     () => {
       const fb = extractFunctions(before, unitsBefore);

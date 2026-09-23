@@ -42,6 +42,12 @@ export const Unit = z.object({
  */
 export const FunctionChange = z.enum(['lost', 'moved', 'added', 'reworded', 'kept']);
 
+export const MaterialChange = z.object({
+  kind: z.enum(['prohibition', 'obligation', 'frequency', 'scope']),
+  title: z.string(), detail: z.string(),
+  beforeFragment: z.string(), afterFragment: z.string(),
+});
+
 export const FunctionDiff = z.object({
   change: FunctionChange,
   text: z.string(),
@@ -50,6 +56,7 @@ export const FunctionDiff = z.object({
   similarity: z.number().min(0).max(1),
   evidenceBefore: z.array(Evidence),
   evidenceAfter: z.array(Evidence),
+  materialChanges: z.array(MaterialChange).default([]),
   reviewCandidates: z.array(z.object({ evidence: Evidence, similarity: z.number().min(0).max(1), owner: z.string() })).default([]),
   /** Объяснение от модели; при пустом ключе берётся из фикстур. */
   rationale: z.string().nullable(),

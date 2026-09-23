@@ -71,6 +71,10 @@ export function FunctionsSection({ functions }: { functions: FunctionDiff[] }) {
                 </td>
                 <td className="py-2 pr-3">
                   <div className="font-medium text-slate-900">{f.text}</div>
+                  {!!f.materialChanges?.length && <div className="mt-2 rounded-lg bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                    <span className="font-semibold">Контрпроверка: </span>{f.materialChanges.map((s) => s.title).join('; ')}.
+                    <span className="block mt-1">Сходство текста не подтверждает сохранение смысла. Сравните обе редакции в плане реорганизации.</span>
+                  </div>}
                   {f.rationale ? (
                     <div className="mt-1 border-l-2 border-slate-300 pl-2 text-[13px] text-slate-600">
                       <span className="font-semibold text-slate-500">Обоснование агента: </span>

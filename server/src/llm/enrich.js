@@ -71,6 +71,11 @@ export function deterministicConclusion({ units, functions, duplicates, conflict
   }
   const lost = functions.filter((f) => f.change === 'lost');
   const moved = functions.filter((f) => f.change === 'moved');
+  const material = functions.filter((f) => f.materialChanges?.length);
+  if (material.length) {
+    add(`Формулировок для контрпроверки: ${material.length}. В сопоставленных пунктах изменились признаки запрета, обязательности, периодичности или охвата. Высокое сходство текста не подтверждает сохранение смысла.`, material);
+    recommend('Согласовать изменения выделенных формулировок по обеим редакциям; проверить, были ли изменения намеренными и сохранён ли необходимый контроль.', material);
+  }
   if (moved.length) add(`Функций сменили владельца: ${moved.length}. Проверьте распределение ответственности.`, moved);
   if (lost.length) {
     add(`Функций без найденного соответствия: ${lost.length}. Это потенциальная утрата, требующая проверки.`, lost);
@@ -86,7 +91,7 @@ export function deterministicConclusion({ units, functions, duplicates, conflict
   if (gaps.length) recommend('Проверить полноту описания функций новых подразделений и при необходимости уточнить положение.', gaps);
   if (!recommendations.length) recommend('Выполнить выборочную проверку сопоставленных формулировок.', functions.length ? functions : units);
   return {
-    summary: `Сопоставлены документы «до» и «после». Подразделений в новой редакции: ${units.filter((u) => u.status !== 'removed').length}. Передач функций: ${moved.length}; потенциальных утрат: ${lost.length}; пересечений: ${duplicates.length}. Подтверждающие фрагменты приведены ниже.`,
+    summary: `Сопоставлены документы «до» и «после». Подразделений в новой редакции: ${units.filter((u) => u.status !== 'removed').length}. Передач функций: ${moved.length}; потенциальных утрат: ${lost.length}; пересечений: ${duplicates.length}; формулировок для контрпроверки: ${material.length}. Подтверждающие фрагменты приведены ниже.`,
     findings, findingEvidence, recommendations, recommendationEvidence, disclaimer: DISCLAIMER,
   };
 }

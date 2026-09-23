@@ -4,6 +4,7 @@ import { ACTION_LABELS, CASE_LABELS, requestPlan } from '../planning'
 import type { Action, CaseKind, Decision, Plan, ReviewCase } from '../planning'
 import { FlowMap } from './FlowMap'
 import { EvidenceDisclosure } from './EvidenceDisclosure'
+import Countercheck from './Countercheck'
 
 function DecisionEditor({ item, decision, plan, busy, onSave, onRemove }: {
   item: ReviewCase; decision?: Decision; plan: Plan; busy: boolean;
@@ -14,7 +15,9 @@ function DecisionEditor({ item, decision, plan, busy, onSave, onRemove }: {
   const [note, setNote] = useState(decision?.note || '')
   const [refs, setRefs] = useState<string[]>(decision?.refs || item.evidence.map((e) => e.ref))
   const sources = [...new Map([...item.evidence, ...item.candidates.map((c) => c.evidence)].map((e) => [e.ref, e])).values()]
-  const canSave = note.trim().length >= 10 && refs.length > 0 && (action !== 'assign' || !!owner)
+  const needsBoth = action === 'confirm' || item.kind === 'material'
+  const coversBoth = ['red8', 'red9'].every((doc) => sources.some((e) => e.docId === doc && refs.includes(e.ref)))
+  const canSave = note.trim().length >= 10 && refs.length > 0 && (action !== 'assign' || !!owner) && (!needsBoth || coversBoth)
   return <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5">
     <div className="text-xs font-bold uppercase tracking-wider text-sky-700">{CASE_LABELS[item.kind]}</div>
     <h3 className="mt-2 text-base font-semibold text-slate-900">{item.title}</h3>
@@ -42,6 +45,7 @@ function DecisionEditor({ item, decision, plan, busy, onSave, onRemove }: {
           className="mt-1 block w-full resize-y rounded-lg border border-slate-300 px-3 py-2 font-normal" />
       </label>
       <fieldset><legend className="text-sm font-semibold text-slate-700">Источники решения</legend>
+        {needsBoth && <p className="mt-1 text-xs text-slate-500">Нужны выбранные источники обеих редакций.</p>}
         <div className="mt-2 max-h-44 space-y-1 overflow-auto rounded-lg bg-slate-50 p-3">
           {sources.map((e) => <label key={e.ref} className="flex items-start gap-2 text-xs text-slate-600">
             <input type="checkbox" checked={refs.includes(e.ref)} disabled={busy} onChange={(event) => setRefs(event.target.checked ? [...refs, e.ref] : refs.filter((r) => r !== e.ref))} />
@@ -62,7 +66,8 @@ function DecisionEditor({ item, decision, plan, busy, onSave, onRemove }: {
 }
 
 export function ReorganizationLab({ report }: { report: AnalysisReport }) {
-  const [tab, setTab] = useState<'map' | 'decisions'>('map')
+  const materialCount = report.functions.filter((f) => f.materialChanges?.length).length
+  const [tab, setTab] = useState<'map' | 'countercheck' | 'decisions'>(materialCount ? 'countercheck' : 'map')
   const [plan, setPlan] = useState<Plan | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [filter, setFilter] = useState<CaseKind | 'all'>('all')
@@ -132,14 +137,20 @@ export function ReorganizationLab({ report }: { report: AnalysisReport }) {
       </div>}
       {plan && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-700"><div className="h-full bg-emerald-400 transition-all duration-500" style={{ width: `${plan.stats.total ? 100 * plan.stats.reviewed / plan.stats.total : 100}%` }} /></div>}
     </header>
-    <div className="flex gap-2 border-b border-slate-200 px-5 pt-3" role="tablist" aria-label="Рабочая область реорганизации">
+    <div className="flex flex-wrap gap-2 border-b border-slate-200 px-5 pt-3" role="tablist" aria-label="Рабочая область реорганизации">
       <button id="map-tab" role="tab" aria-controls="map-panel" aria-selected={tab === 'map'} onClick={() => setTab('map')} className={`border-b-2 px-3 py-3 text-sm font-semibold ${tab === 'map' ? 'border-sky-600 text-sky-800' : 'border-transparent text-slate-500'}`}>01 · Карта ответственности</button>
-      <button id="decisions-tab" role="tab" aria-controls="decisions-panel" aria-selected={tab === 'decisions'} onClick={() => setTab('decisions')} className={`border-b-2 px-3 py-3 text-sm font-semibold ${tab === 'decisions' ? 'border-sky-600 text-sky-800' : 'border-transparent text-slate-500'}`}>02 · Разобрать находки</button>
+      <button id="countercheck-tab" role="tab" aria-controls="countercheck-panel" aria-selected={tab === 'countercheck'} onClick={() => setTab('countercheck')} className={`border-b-2 px-3 py-3 text-sm font-semibold ${tab === 'countercheck' ? 'border-violet-600 text-violet-800' : 'border-transparent text-slate-500'}`}>02 · Контрпроверка{materialCount ? ` · ${materialCount}` : ''}</button>
+      <button id="decisions-tab" role="tab" aria-controls="decisions-panel" aria-selected={tab === 'decisions'} onClick={() => setTab('decisions')} className={`border-b-2 px-3 py-3 text-sm font-semibold ${tab === 'decisions' ? 'border-sky-600 text-sky-800' : 'border-transparent text-slate-500'}`}>03 · Разобрать находки</button>
     </div>
     <div className="p-4 md:p-6">
       {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
       {status && <p role="status" className="mb-4 text-xs text-slate-600">{status}</p>}
-      {tab === 'map' ? <div id="map-panel" role="tabpanel" aria-labelledby="map-tab"><FlowMap report={report} /></div> : <div id="decisions-panel" role="tabpanel" aria-labelledby="decisions-tab">
+      {tab === 'map' ? <div id="map-panel" role="tabpanel" aria-labelledby="map-tab"><FlowMap report={report} /></div> : tab === 'countercheck' ? <div id="countercheck-panel" role="tabpanel" aria-labelledby="countercheck-tab">
+        <Countercheck functions={report.functions} onReview={plan ? (f) => {
+          const item = plan.cases.find((c) => c.kind === 'material' && c.evidence.some((e) => e.ref === f.evidenceBefore[0]?.ref) && c.evidence.some((e) => e.ref === f.evidenceAfter[0]?.ref))
+          if (item) { setSelected(item.id); setFilter('material'); setTab('decisions') }
+        } : undefined} />
+      </div> : <div id="decisions-panel" role="tabpanel" aria-labelledby="decisions-tab">
         {!plan ? <p className="text-slate-600">{reportId ? 'Загружаем план…' : 'Повторите анализ, чтобы открыть план для текущей версии сервера.'}</p> : <>
           <div className="mb-4 flex flex-wrap gap-2">
             <button onClick={() => setFilter('all')} className={`rounded-full border px-3 py-1 text-xs ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}>Все · {plan.cases.length}</button>
