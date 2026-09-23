@@ -80,7 +80,7 @@ test('Демонстрация и загрузка тех же скачивае�
   for (const side of ['before', 'after']) {
     const download = await fetch(`${base}/api/examples/countercheck/${side}.xlsx`);
     assert.equal(download.status, 200);
-    form.append(side, new Blob([await download.arrayBuffer()]), `${side}.xlsx`);
+    form.append(side, new Blob([await download.arrayBuffer()]), demo.meta[side].name);
   }
   const upload = await fetch(`${base}/api/analyze`, { method: 'POST', body: form });
   assert.equal(upload.status, 200);

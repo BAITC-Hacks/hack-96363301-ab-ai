@@ -57,7 +57,10 @@ function SourceColumn({ label, owner, evidence, fragments, after = false }: {
       {owner && <span className="max-w-full break-words rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">{owner}</span>}
     </div>
     {evidence.map((ev, index) => <div key={`${ev.ref}-${index}`} className="mt-3">
-      <p className="break-words font-mono text-[11px] text-slate-500">{ev.ref} · п. {ev.number}</p>
+      {(ev.fileName || ev.fileId) && <p className="mb-1 break-all text-xs font-medium text-slate-700">
+        <span className="font-normal text-slate-500">Файл: </span>{ev.fileName || ev.fileId}
+      </p>}
+      <p className="break-all font-mono text-[11px] text-slate-500">{ev.ref} · п. {ev.number}</p>
       <blockquote className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-900">
         <Highlight text={ev.text} fragments={fragments} />
       </blockquote>

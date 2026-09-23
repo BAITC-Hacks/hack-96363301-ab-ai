@@ -18,6 +18,8 @@ export const ClauseRef = z.string().regex(/^red\d+#[a-z\d.]+[а-яё]?$/u, 'ож
 export const Evidence = z.object({
   ref: ClauseRef,
   docId: z.string(),
+  fileId: z.string().optional(),
+  fileName: z.string().optional(),
   number: z.string(),
   text: z.string(),
 });
@@ -100,6 +102,7 @@ export const TraceStep = z.object({
 
 export const AnalysisQuality = z.object({
   documents: z.array(z.object({
+    fileId: z.string().optional(),
     docId: z.string(), name: z.string(), clauses: z.number().int().nonnegative(), units: z.number().int().nonnegative(),
     functionClauses: z.number().int().nonnegative(), ownerBindings: z.number().int().nonnegative(), unassignedClauses: z.number().int().nonnegative(),
   })),
@@ -107,12 +110,17 @@ export const AnalysisQuality = z.object({
   checkedReferences: z.number().int().nonnegative(), uniqueSources: z.number().int().nonnegative(),
 });
 
+const DocumentSetMeta = z.object({
+  docId: z.string(), name: z.string(), clauses: z.number(),
+  documents: z.array(z.object({ fileId: z.string(), name: z.string(), clauses: z.number() })).optional(),
+});
+
 /** Полный отчёт — то, что отдаёт POST /api/analyze и рисует фронтенд. */
 export const AnalysisReport = z.object({
   meta: z.object({
     reportId: z.string().uuid().optional(),
-    before: z.object({ docId: z.string(), name: z.string(), clauses: z.number() }),
-    after: z.object({ docId: z.string(), name: z.string(), clauses: z.number() }),
+    before: DocumentSetMeta,
+    after: DocumentSetMeta,
     mode: z.enum(['live', 'demo']),
     generatedAt: z.string(),
   }),

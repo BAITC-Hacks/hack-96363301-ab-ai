@@ -1,8 +1,9 @@
-import { extractOwners } from './units.js';
+import { extractOwners, extractUnits } from './units.js';
+import { sourceEvidence } from '../parse/evidence.js';
 
 const childOf = (number, parent) => number !== parent &&
   (number.startsWith(`${parent}.`) || (number.startsWith(parent) && /^[а-яё]$/u.test(number.slice(parent.length))));
-const cite = (clause) => ({ ref: clause.id, docId: clause.docId, number: clause.number, text: clause.text });
+const cite = sourceEvidence;
 
 /** Counts describe recognized structure, never an invented completeness percentage. */
 export function describeCoverage(doc, units, functions, name) {
@@ -30,7 +31,7 @@ export function describeCoverage(doc, units, functions, name) {
         evidence: [source, ...excluded].filter(Boolean).map(cite) });
     } else if (header.generic) {
       warnings.push({ code: 'generic_owner', title: 'Владельцы определены по общему заголовку',
-        detail: `Блок «${header.title}» отнесён ко всем распознанным подразделениям: ${header.units.join(', ')}. Проверьте применимость общего заголовка к каждому из них.`,
+        detail: `Блок «${header.title}» отнесён к подразделениям из состава текущего файла: ${header.units.join(', ')}. Проверьте применимость общего заголовка к каждому из них.`,
         evidence: [source].filter(Boolean).map(cite) });
     }
   }
@@ -40,8 +41,15 @@ export function describeCoverage(doc, units, functions, name) {
     if (diagnostic.code === 'missing_function_owner') unassigned.add(source.id);
     warnings.push({ code: diagnostic.code, title: 'Функция без указанного подразделения', detail: diagnostic.detail, evidence: [cite(source)] });
   }
+  const localUnits = extractUnits(doc);
+  if (!localUnits.length && !functionRefs.size && !doc.diagnostics?.length) {
+    const source = doc.clauses.find((c) => c.number);
+    if (!source) throw new Error(`Файл «${name}»: не найдены адресуемые пункты или строки. Для DOCX/PDF нужна нумерация, для XLSX — столбцы «Подразделение» и «Функция».`);
+    warnings.push({ code: 'unrecognized_document', title: 'В файле не распознаны функции и состав подразделений',
+      detail: `Файл «${name}» разобран, но его пункты не включены в сопоставление функций. Распорядительные формулировки могли использоваться для сопоставления подразделений. Проверьте назначение файла и его структуру.`, evidence: [cite(source)] });
+  }
   return {
-    document: { docId: doc.docId, name, clauses: doc.clauses.length, units: units.length,
+    document: { docId: doc.docId, ...(doc.fileId ? { fileId: doc.fileId } : {}), name, clauses: doc.clauses.length, units: localUnits.length,
       functionClauses: functionRefs.size, ownerBindings: functions.length, unassignedClauses: unassigned.size },
     warnings,
   };

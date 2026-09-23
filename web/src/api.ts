@@ -89,10 +89,10 @@ export function analyzeCountercheck(): Promise<AnalyzeResult> {
   return post('{}', { 'Content-Type': 'application/json' }, '/api/analyze/countercheck')
 }
 
-/** Пользовательский комплект: два .docx. */
-export function analyzeFiles(before: File, after: File): Promise<AnalyzeResult> {
+/** Две редакции: по одному или несколько файлов DOCX, PDF, XLSX. */
+export function analyzeFiles(before: File | File[], after: File | File[]): Promise<AnalyzeResult> {
   const form = new FormData()
-  form.append('before', before)
-  form.append('after', after)
+  for (const file of Array.isArray(before) ? before : [before]) form.append('before', file)
+  for (const file of Array.isArray(after) ? after : [after]) form.append('after', file)
   return post(form)
 }

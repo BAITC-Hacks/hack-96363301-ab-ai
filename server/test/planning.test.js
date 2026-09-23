@@ -49,7 +49,7 @@ test('Excel содержит решения, источник, гиперссы�
   const plan = buildPlan(report, [{ ...decision, note: '=HYPERLINK("https://example.invalid", "plain text")' }]);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await exportPlan(report, plan));
-  assert.deepEqual(workbook.worksheets.map((s) => s.name), ['Обзор', 'Источники', 'План решений', 'Сопоставление функций', 'Качество анализа']);
+  assert.deepEqual(workbook.worksheets.map((s) => s.name), ['Обзор', 'Комплект документов', 'Источники', 'План решений', 'Сопоставление функций', 'Качество анализа']);
   const sheet = workbook.getWorksheet('План решений');
   assert.equal(sheet.getCell('E2').text, 'ОА');
   assert.equal(typeof sheet.getCell('F2').value, 'string');
@@ -57,6 +57,90 @@ test('Excel содержит решения, источник, гиперссы�
   assert.match(sheet.getCell('I2').text, /Проект решения/);
   const source = workbook.getWorksheet('Источники');
   assert.equal(source.getCell('D2').text, lost.evidence[0].text);
+});
+
+test('Excel сохраняет фактические имена файлов, состав многодокументного комплекта и адреса источников', async () => {
+  const multi = structuredClone(report);
+  const beforeFiles = [
+    { fileId: 'faaa', name: 'Положение об отделах.docx', clauses: 12 },
+    { fileId: 'fbbb', name: 'Обязанности руководителей.xlsx', clauses: 8 },
+  ];
+  const afterFiles = [{ fileId: 'fccc', name: 'Новая структура.xlsx', clauses: 25 }];
+  multi.meta.before = { ...multi.meta.before, name: 'Комплект до: 2 файла', documents: beforeFiles };
+  multi.meta.after = { ...multi.meta.after, name: 'Комплект после: 1 файл', documents: afterFiles };
+  const assigned = new Map();
+  const sourceNames = new Map();
+  const sideCounts = { red8: 0, red9: 0 };
+  const enrich = (value) => {
+    if (!value || typeof value !== 'object') return;
+    if (value.ref && value.docId && typeof value.text === 'string') {
+      const originalRef = value.ref;
+      if (!assigned.has(originalRef)) {
+        const files = value.docId === 'red8' ? beforeFiles : afterFiles;
+        assigned.set(originalRef, files[sideCounts[value.docId]++ % files.length]);
+      }
+      const file = assigned.get(originalRef);
+      value.ref = `${value.docId}#${file.fileId}.${originalRef.split('#')[1]}`;
+      value.fileId = file.fileId;
+      value.fileName = file.name;
+      sourceNames.set(value.ref, { fileId: file.fileId, fileName: file.name });
+    }
+    for (const item of Object.values(value)) enrich(item);
+  };
+  enrich(multi);
+  multi.quality.documents = [
+    ...beforeFiles.map((file) => ({ ...multi.quality.documents[0], ...file, docId: 'red8' })),
+    ...afterFiles.map((file) => ({ ...multi.quality.documents.at(-1), ...file, docId: 'red9' })),
+  ];
+  const warningSource = multi.functions.flatMap((item) => item.evidenceBefore)[0];
+  multi.quality.warnings.push({ code: 'file_review', title: 'Проверка области документа', detail: 'Требуется проверить область применения положения.', evidence: [warningSource] });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await exportPlan(multi, buildPlan(multi)));
+
+  const inventory = workbook.getWorksheet('Комплект документов');
+  assert.deepEqual([2, 3, 4].map((row) => inventory.getRow(row).values.slice(1)), [
+    ['До', beforeFiles[0].name, 'faaa', 12], ['До', beforeFiles[1].name, 'fbbb', 8], ['После', afterFiles[0].name, 'fccc', 25],
+  ]);
+  const sourceSheet = workbook.getWorksheet('Источники');
+  const exportedNames = new Set();
+  sourceSheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const expected = sourceNames.get(row.getCell(1).text);
+    assert.ok(expected, 'each exported ref must point to an enriched source');
+    assert.equal(row.getCell(2).text, expected.fileName);
+    assert.equal(row.getCell(5).text, expected.fileId);
+    exportedNames.add(row.getCell(2).text);
+  });
+  assert.deepEqual(exportedNames, new Set([...beforeFiles, ...afterFiles].map((file) => file.name)));
+  const exportedRefs = new Set(sourceSheet.getColumn(1).values.filter((value) => typeof value === 'string'));
+  assert.ok(multi.units.flatMap((unit) => unit.evidence).every((source) => exportedRefs.has(source.ref)), 'definitions from structure-only files are exported too');
+  const quality = workbook.getWorksheet('Качество анализа');
+  assert.equal(quality.getCell('B2').text, beforeFiles[0].name);
+  assert.equal(quality.getCell('G2').text, beforeFiles[0].fileId);
+
+  let links = 0;
+  workbook.eachSheet((sheet) => sheet.eachRow((row) => row.eachCell((cell) => {
+    const value = cell.value;
+    if (!value || typeof value !== 'object' || !value.hyperlink) return;
+    const match = /^#'([^']+)'!(A\d+)$/u.exec(value.hyperlink);
+    assert.ok(match, 'links must address a named source sheet, not a shifted sheet index');
+    assert.equal(match[1], 'Источники');
+    assert.equal(workbook.getWorksheet(match[1]).getCell(match[2]).text, value.text);
+    links += 1;
+  })));
+  assert.ok(links > 0);
+});
+
+test('Excel строит состав комплекта для старого отчёта без файловых метаданных', async () => {
+  const legacy = structuredClone(report);
+  delete legacy.meta.before.documents;
+  delete legacy.meta.after.documents;
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await exportPlan(legacy, buildPlan(legacy)));
+  const inventory = workbook.getWorksheet('Комплект документов');
+  assert.equal(inventory.rowCount, 3);
+  assert.deepEqual(inventory.getRow(2).values.slice(1), ['До', legacy.meta.before.name, legacy.meta.before.docId, legacy.meta.before.clauses]);
+  assert.deepEqual(inventory.getRow(3).values.slice(1), ['После', legacy.meta.after.name, legacy.meta.after.docId, legacy.meta.after.clauses]);
 });
 
 test('Хранилище ограничено; клиент не может подменить отчёт в запросе плана', async (t) => {

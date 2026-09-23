@@ -9,6 +9,7 @@ import multer from 'multer';
 
 import { analyze, hasApiKey } from './pipeline.js';
 import { decodeFileName } from './parse/document.js';
+import { MAX_FILES_PER_SIDE, MAX_FILE_BYTES } from './parse/collection.js';
 import { rememberReport, storedReport, PlanRequest, buildPlan, exportPlan } from './planning.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -28,7 +29,7 @@ const DEMO_SET = {
  * преобразование ничего не меняет.
  */
 export const app = express();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: MAX_FILES_PER_SIDE * 2 } });
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
@@ -82,21 +83,19 @@ app.post('/api/analyze/countercheck', async (_req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/analyze', upload.fields([{ name: 'before', maxCount: 1 }, { name: 'after', maxCount: 1 }]), async (req, res) => {
-  const before = req.files?.before?.[0];
-  const after = req.files?.after?.[0];
+app.post('/api/analyze', upload.fields([{ name: 'before', maxCount: MAX_FILES_PER_SIDE }, { name: 'after', maxCount: MAX_FILES_PER_SIDE }]), async (req, res) => {
+  const before = req.files?.before;
+  const after = req.files?.after;
 
   if (!before || !after) {
-    res.status(400).json({ error: 'Нужны оба файла: поля before и after (DOCX, PDF, XLSX)' });
+    res.status(400).json({ error: 'Нужен минимум один файл в каждой редакции: поля before и after (DOCX, PDF, XLSX).' });
     return;
   }
 
   try {
     const report = await analyze({
-      beforeBuffer: before.buffer,
-      beforeName: decodeFileName(before.originalname),
-      afterBuffer: after.buffer,
-      afterName: decodeFileName(after.originalname),
+      beforeFiles: before.map((file) => ({ buffer: file.buffer, name: decodeFileName(file.originalname) })),
+      afterFiles: after.map((file) => ({ buffer: file.buffer, name: decodeFileName(file.originalname) })),
     });
     res.json(rememberReport(report));
   } catch (err) {
@@ -121,7 +120,8 @@ for (const endpoint of ['/api/plan', '/api/plan/export']) {
 }
 
 app.use((err, _req, res, _next) => {
-  res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Максимальный размер файла — 20 МБ.' : err.message });
+  res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Максимальный размер файла — 20 МБ.' :
+    ['LIMIT_FILE_COUNT', 'LIMIT_UNEXPECTED_FILE'].includes(err.code) ? 'Допустимо до 5 файлов в каждой редакции, в полях before и after.' : err.message });
 });
 
 // Собранный фронтенд отдаётся тем же процессом: одна команда запуска,

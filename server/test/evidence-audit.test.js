@@ -50,6 +50,25 @@ test('Подмена текста, номера или документа сущ
   }
 });
 
+test('Имя и идентификатор файла проверяются даже при точной цитате и существующем адресе', () => {
+  for (const field of ['fileId', 'fileName']) {
+    const { report, clauseIndex } = fixture();
+    const source = clauseIndex.get('before/function');
+    source.fileId = 'f0123456789abcdef';
+    source.fileName = 'Обязанности.docx';
+    const apply = (value) => {
+      if (Array.isArray(value)) return value.forEach(apply);
+      if (!value || typeof value !== 'object') return;
+      if (value.ref === source.id) Object.assign(value, { fileId: source.fileId, fileName: source.fileName });
+      Object.values(value).forEach(apply);
+    };
+    apply(report);
+    assert.doesNotThrow(() => auditReportEvidence(report, clauseIndex));
+    report.functions[0].evidenceBefore[0][field] = 'Подмена';
+    assert.throws(() => auditReportEvidence(report, clauseIndex), new RegExp(`поле ${field}`));
+  }
+});
+
 test('Каждая находка требует хотя бы один источник', () => {
   for (const collection of ['units', 'duplicates', 'conflicts', 'gaps']) {
     const { report, clauseIndex } = fixture();

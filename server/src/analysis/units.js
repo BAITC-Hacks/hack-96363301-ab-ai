@@ -15,6 +15,8 @@
  * функций» — это первое, что заметил бы проверяющий эксперт.
  */
 
+import { sourceEvidence } from '../parse/evidence.js';
+
 const UNIT_NAME_RE = /^(департамент|управление|отдел|служба|бюро)\s/iu;
 const OWNER_HEADER_RE = /^(директор|начальник|руководитель|функции\s+(департамента|отдела|управления|службы|бюро))/iu;
 const ORG_FUNCTIONS_RE = /осуществляет следующие функции|функции (организации|общества|блока)|^функции:?$/iu;
@@ -51,11 +53,40 @@ function nameKeywords(name) {
  * @returns {Array<{name: string, abbr: string|null, ref: string}>}
  */
 export function extractUnits(doc) {
-  const seen = new Set();
-  return doc.clauses
+  return mergeUnits(doc.clauses
     .filter((c) => c.unitDefinition || (UNIT_NAME_RE.test(c.text) && c.text.length < 250 && !/[;:]|обязан|осуществля|выполня/iu.test(c.text)))
-    .map((c) => ({ ...parseUnitName(c.unitDefinition || c.text), ref: c.id, number: c.number }))
-    .filter((u) => { const key = normalizeText(u.name); if (seen.has(key)) return false; seen.add(key); return true; });
+    .map((c) => ({ ...parseUnitName(c.unitDefinition || c.text), ref: c.id, number: c.number, fileName: c.fileName })));
+}
+
+/** Merge identities across files, retaining every definition and rejecting ambiguity. */
+export function mergeUnits(units) {
+  const byName = new Map();
+  const byAbbr = new Map();
+  for (const unit of units) {
+    const name = normalizeText(unit.name);
+    const previous = byName.get(name);
+    const abbr = normalizeText(unit.abbr);
+    if ((previous?.abbr && abbr && normalizeText(previous.abbr) !== abbr) ||
+        (abbr && byAbbr.has(abbr) && byAbbr.get(abbr) !== name)) {
+      throw new Error(`Неоднозначное подразделение «${unit.name}» (${unit.abbr})${unit.fileName ? ` в файле «${unit.fileName}»` : ''}: название или аббревиатура противоречат другому определению в этой редакции. Уточните наименования.`);
+    }
+    if (abbr) byAbbr.set(abbr, name);
+    const refs = unit.refs || [unit.ref];
+    if (previous) {
+      previous.abbr ||= unit.abbr;
+      previous.refs = [...new Set([...previous.refs, ...refs])];
+    } else byName.set(name, { ...unit, refs: [...refs] });
+  }
+  // XLSX owners may use a short abbreviation while a separate structure file
+  // supplies the full definition. Resolve that alias before building diff maps.
+  for (const [name, unit] of byName) {
+    const canonicalName = !unit.abbr && byAbbr.get(name);
+    if (!canonicalName || canonicalName === name) continue;
+    const canonical = byName.get(canonicalName);
+    canonical.refs = [...new Set([...canonical.refs, ...unit.refs])];
+    byName.delete(name);
+  }
+  return [...byName.values()];
 }
 
 /**
@@ -68,19 +99,28 @@ export function extractUnits(doc) {
  */
 export function extractOwners(doc, units) {
   const owners = new Map();
+  // Explicit names can resolve through the whole set. A generic heading only
+  // applies to the composition defined inside its own file.
+  const localRefs = new Set(extractUnits(doc).flatMap((u) => u.refs));
+  const genericUnits = doc.fileId ? units.filter((u) => (u.refs || [u.ref]).some((ref) => localRefs.has(ref))) : units;
 
   for (const header of doc.clauses.filter((c) => c.number && OWNER_HEADER_RE.test(c.text) && !/;|подчиня|штатн|должност[еьи]/iu.test(c.text))) {
     const norm = normalizeText(header.text);
-    const matched = units.filter((u) => {
+    const abbreviations = units.filter((u) => {
       // \b в JavaScript опирается на ASCII-\w и с кириллицей не работает:
       // /\bДОА\b/ не находит «ДИТААД и ДОА». Границу задаём явно.
-      if (u.abbr && new RegExp(`(^|[^A-Za-zА-ЯЁа-яё])${u.abbr}([^A-Za-zА-ЯЁа-яё]|$)`, 'u').test(header.text)) return true;
+      return u.abbr && new RegExp(`(^|[^A-Za-zА-ЯЁа-яё])${u.abbr}([^A-Za-zА-ЯЁа-яё]|$)`, 'u').test(header.text);
+    });
+    const named = units.filter((u) => {
       const kw = nameKeywords(u.name);
       return kw.length > 0 && kw.every((w) => norm.includes(w));
     });
+    const matched = abbreviations.length ? abbreviations : named.filter((u) => !named.some((v) =>
+      v !== u && nameKeywords(v.name).length > nameKeywords(u.name).length &&
+      nameKeywords(u.name).every((w) => nameKeywords(v.name).includes(w))));
 
     // Обобщённый заголовок без конкретных аббревиатур — «Директоры
-    // департаментов обязаны…» — относится ко всем департаментам сразу.
+    // департаментов обязаны…» — относится к составу этого файла.
     // В редакции 9 так объединили два отдельных блока прав (Директор ДККМ и
     // Директор ДНМ) из редакции 8. Без этого правила их подпункты остаются
     // без владельца и попадают в отчёт как дюжина несуществующих «потерь».
@@ -90,7 +130,7 @@ export function extractOwners(doc, units) {
       number: header.number,
       ref: header.id,
       title: header.text.replace(/:$/, '').trim(),
-      units: generic ? units.filter((u) => /^департамент\s/iu.test(u.name)).map((u) => u.abbr || u.name) : matched.map((u) => u.abbr || u.name),
+      units: generic ? genericUnits.filter((u) => /^департамент\s/iu.test(u.name)).map((u) => u.abbr || u.name) : matched.map((u) => u.abbr || u.name),
       generic,
     });
   }
@@ -129,7 +169,8 @@ export function extractFunctions(doc, units) {
     const meaningful = /[а-яёa-z]{2}/iu.test(clause.text);
 
     if (clause.functionOwner) {
-      const unit = units.find((u) => normalizeText(u.name) === normalizeText(parseUnitName(clause.functionOwner).name));
+      const ownerName = normalizeText(parseUnitName(clause.functionOwner).name);
+      const unit = units.find((u) => normalizeText(u.name) === ownerName || (u.abbr && normalizeText(u.abbr) === ownerName));
       out.push({ ref: clause.id, number: clause.number, docId: clause.docId, text: clause.text,
         owner: unit?.abbr || clause.functionOwner, ownerTitle: clause.functionOwner, scope: 'unit' });
       continue;
@@ -187,14 +228,10 @@ export function diffUnits(unitsBefore, unitsAfter, clauseIndex) {
   // Текст цитаты берётся из индекса парсера, а не пересобирается здесь:
   // источник истины для формулировки — всегда исходный документ.
   const cite = (unit) => {
-    if (!unit) return null;
-    const clause = clauseIndex?.get(unit.ref);
-    return {
-      ref: unit.ref,
-      docId: unit.ref.split('#')[0],
-      number: unit.number,
-      text: clause ? clause.text : unit.name,
-    };
+    if (!unit) return [];
+    return (unit.refs || [unit.ref]).map((ref) => sourceEvidence(clauseIndex?.get(ref) || {
+      ref, docId: ref.split('#')[0], number: unit.number, text: unit.name,
+    }));
   };
 
   for (const [k, after] of afterMap) {
@@ -213,7 +250,7 @@ export function diffUnits(unitsBefore, unitsAfter, clauseIndex) {
       name: after.name,
       abbr: after.abbr,
       status: reorganized ? 'reorganized' : before ? 'kept' : 'created',
-      evidence: [...new Map([cite(before), cite(after), ...predecessors.map(cite), ...orders.map((c) => ({ref:c.id, docId:c.docId, number:c.number, text:c.text}))].filter(Boolean).map((e) => [e.ref, e])).values()],
+      evidence: [...new Map([...cite(before), ...cite(after), ...predecessors.flatMap(cite), ...orders.map(sourceEvidence)].map((e) => [e.ref, e])).values()],
       note: reorganized ? `Изменение подразделения: ${[...new Set([before, ...predecessors].map((u) => u.name))].join(', ')} → ${after.name}.` : before
         ? null
         : 'Подразделение отсутствует в редакции «до» — создано при реорганизации.',
@@ -226,7 +263,7 @@ export function diffUnits(unitsBefore, unitsAfter, clauseIndex) {
       name: before.name,
       abbr: before.abbr,
       status: 'removed',
-      evidence: [cite(before)],
+      evidence: cite(before),
       note: 'Подразделение отсутствует в редакции «после».',
     });
   }

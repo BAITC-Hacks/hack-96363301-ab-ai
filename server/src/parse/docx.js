@@ -1,4 +1,5 @@
 import mammoth from 'mammoth';
+import { sourceEvidence } from './evidence.js';
 
 /**
  * Разбор .docx в пронумерованные пункты.
@@ -197,7 +198,7 @@ export function verifyCitations(citations, index) {
   const invalid = [];
   for (const ref of citations || []) {
     const clause = index.get(ref);
-    if (clause) valid.push({ ref, number: clause.number, docId: clause.docId, text: clause.text });
+    if (clause) valid.push(sourceEvidence(clause));
     else invalid.push(ref);
   }
   return { valid, invalid };

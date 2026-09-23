@@ -93,7 +93,7 @@ export default function App() {
           onDemo={() => void run('Контрольный комплект: редакция 8 → редакция 9', analyzeDemo)}
           onExample={() => void run('Независимый учебный пример: переименование, перенос, утрата и пересечение функций', analyzeExample)}
           onCountercheck={() => void run('Контрпроверка: небольшие изменения формулировок в учебном примере', analyzeCountercheck)}
-          onFiles={(b, a) => void run(`${b.name} → ${a.name}`, () => analyzeFiles(b, a))}
+          onFiles={(b, a) => void run(`Комплект: ${b.length} до → ${a.length} после`, () => analyzeFiles(b, a))}
         />
       </details>
 

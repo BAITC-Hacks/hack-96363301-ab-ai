@@ -10,6 +10,8 @@ export type ClauseRef = string
 export interface Evidence {
   ref: ClauseRef
   docId: string
+  fileId?: string
+  fileName?: string
   number: string
   text: string
 }
@@ -92,12 +94,13 @@ export interface TraceStep {
 
 export interface DocMeta {
   docId: string
+  documents?: Array<{ fileId: string; name: string; clauses: number }>
   name: string
   clauses: number
 }
 
 export interface AnalysisQuality {
-  documents: Array<{ docId: string; name: string; clauses: number; units: number; functionClauses: number; ownerBindings: number; unassignedClauses: number }>
+  documents: Array<{ docId: string; fileId?: string; name: string; clauses: number; units: number; functionClauses: number; ownerBindings: number; unassignedClauses: number }>
   warnings: Array<{ code: string; title: string; detail: string; evidence: Evidence[] }>
   checkedReferences: number
   uniqueSources: number

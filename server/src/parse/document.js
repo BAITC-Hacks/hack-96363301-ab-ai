@@ -66,7 +66,7 @@ export async function parseDocument(buffer, docId, name) {
         if (text) clauses.push({ id, docId, number, text, functionOwner: owner });
       });
     });
-    if (!clauses.some((c) => c.functionOwner || c.unassignedFunction)) throw new Error('В XLSX нужны столбцы «Подразделение» и «Функция» (или «Функции», «Обязанности», «Задача»).');
+    if (!clauses.some((c) => c.unitDefinition || c.functionOwner || c.unassignedFunction)) throw new Error('В XLSX нужны столбцы «Подразделение» и «Функция» (или «Функции», «Обязанности», «Задача»).');
     return { docId, clauses, sections: [], diagnostics };
   }
   throw new Error('Поддерживаются DOCX, PDF с текстовым слоем и XLSX. Сохраните старый Word/Excel в новом формате.');

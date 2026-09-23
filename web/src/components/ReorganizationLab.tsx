@@ -47,9 +47,12 @@ function DecisionEditor({ item, decision, plan, busy, onSave, onRemove }: {
       <fieldset><legend className="text-sm font-semibold text-slate-700">Источники решения</legend>
         {needsBoth && <p className="mt-1 text-xs text-slate-500">Нужны выбранные источники обеих редакций.</p>}
         <div className="mt-2 max-h-44 space-y-1 overflow-auto rounded-lg bg-slate-50 p-3">
-          {sources.map((e) => <label key={e.ref} className="flex items-start gap-2 text-xs text-slate-600">
-            <input type="checkbox" checked={refs.includes(e.ref)} disabled={busy} onChange={(event) => setRefs(event.target.checked ? [...refs, e.ref] : refs.filter((r) => r !== e.ref))} />
-            <span>{e.docId === 'red8' ? 'До' : 'После'} · {e.number} · {e.text.slice(0, 100)}{e.text.length > 100 ? '…' : ''}</span>
+          {sources.map((e) => <label key={e.ref} className="flex min-w-0 items-start gap-2 text-xs text-slate-600">
+            <input type="checkbox" className="mt-0.5 shrink-0" checked={refs.includes(e.ref)} disabled={busy} onChange={(event) => setRefs(event.target.checked ? [...refs, e.ref] : refs.filter((r) => r !== e.ref))} />
+            <span className="min-w-0 break-words">
+              {(e.fileName || e.fileId) && <span className="block break-all font-medium text-slate-800">{e.fileName || e.fileId}</span>}
+              <span>{e.docId === 'red8' ? 'До' : 'После'} · п. {e.number} · {e.text.slice(0, 100)}{e.text.length > 100 ? '…' : ''}</span>
+            </span>
           </label>)}
         </div>
       </fieldset>

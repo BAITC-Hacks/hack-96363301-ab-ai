@@ -38,9 +38,9 @@ export function QualityPassport({ quality }: { quality: AnalysisQuality }) {
       </p>}
 
       <div className="grid gap-3 md:grid-cols-2">
-        {quality.documents.map((document) => <section key={document.docId} className="min-w-0 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+        {quality.documents.map((document) => <section key={`${document.docId}:${document.fileId || document.name}`} className="min-w-0 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
           <h3 className="text-[11px] font-bold uppercase tracking-wider text-sky-800">{DOCUMENT_LABELS[document.docId] || document.docId}</h3>
-          <p className="mt-1 break-words text-sm font-medium text-slate-800">{document.name}</p>
+          <p className="mt-1 break-all text-sm font-medium text-slate-800">{document.name}</p>
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-4">
             <Metric label="Распознано пунктов" value={document.clauses} />
             <Metric label="Подразделений" value={document.units} />

@@ -90,13 +90,18 @@ export function deterministicConclusion({ units, functions, duplicates, conflict
   for (const gap of gaps) add(gap.title + '.', [gap]);
   if (gaps.length) recommend('Проверить полноту описания функций новых подразделений и при необходимости уточнить положение.', gaps);
   const unmapped = quality?.warnings.filter((w) => w.code === 'unresolved_owner' || w.code === 'missing_function_owner') || [];
+  const unrecognized = quality?.warnings.filter((w) => w.code === 'unrecognized_document') || [];
+  if (unrecognized.length) {
+    add('В части файлов не распознаны функции и состав подразделений. Сопоставление не подтверждает полноту охвата этих файлов.', unrecognized);
+    recommend('Проверить назначение и структуру файлов, отмеченных в паспорте анализа.', unrecognized);
+  }
   if (unmapped.length) {
     add('Анализ функций неполон: есть блоки или строки без определённого подразделения. Их нельзя считать сохранёнными или утраченными по этому отчёту.', unmapped);
     recommend('Уточнить владельцев отмеченных пунктов и повторить анализ исправленного комплекта.', unmapped);
   }
   if (!recommendations.length) recommend('Выполнить выборочную проверку сопоставленных формулировок.', functions.length ? functions : units);
   return {
-    summary: `${unmapped.length ? 'Внимание: часть пунктов не включена в сравнение из-за неопределённого владельца. ' : ''}Сопоставлены документы «до» и «после». Подразделений в новой редакции: ${units.filter((u) => u.status !== 'removed').length}. Передач функций: ${moved.length}; потенциальных утрат: ${lost.length}; пересечений: ${duplicates.length}; формулировок для контрпроверки: ${material.length}. Подтверждающие фрагменты приведены ниже.`,
+    summary: `${unmapped.length ? 'Внимание: часть пунктов не включена в сравнение из-за неопределённого владельца. ' : ''}${unrecognized.length ? 'В части файлов функции не распознаны; проверьте паспорт анализа. ' : ''}Сопоставлены документы «до» и «после». Подразделений в новой редакции: ${units.filter((u) => u.status !== 'removed').length}. Передач функций: ${moved.length}; потенциальных утрат: ${lost.length}; пересечений: ${duplicates.length}; формулировок для контрпроверки: ${material.length}. Подтверждающие фрагменты приведены ниже.`,
     findings, findingEvidence, recommendations, recommendationEvidence, disclaimer: DISCLAIMER,
   };
 }

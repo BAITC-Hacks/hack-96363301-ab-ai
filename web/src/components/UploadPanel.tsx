@@ -1,30 +1,44 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+
+const MAX_FILES = 5
+const MAX_FILE_BYTES = 20 * 1024 * 1024
+const MAX_TOTAL_BYTES = 100 * 1024 * 1024
+type Side = 'before' | 'after'
+
+const fileKey = (file: File) => JSON.stringify([file.name, file.size, file.lastModified])
+const totalBytes = (files: File[]) => files.reduce((sum, file) => sum + file.size, 0)
+
+function formatBytes(bytes: number) {
+  if (bytes === 0) return '0 МБ'
+  if (bytes < 1024) return `${bytes} Б`
+  const unit = bytes < 1024 * 1024 ? 'КБ' : 'МБ'
+  const value = bytes / (unit === 'КБ' ? 1024 : 1024 * 1024)
+  return `${value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ${unit}`
+}
 
 function FileZone({
   title,
   hint,
-  file,
+  files,
+  error,
   disabled,
-  onPick,
+  onAdd,
+  onRemove,
 }: {
   title: string
   hint: string
-  file: File | null
+  files: File[]
+  error: string | null
   disabled: boolean
-  onPick: (f: File | null) => void
+  onAdd: (files: File[]) => void
+  onRemove: (index: number) => void
 }) {
+  const id = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
 
   function take(list: FileList | null) {
-    const f = list && list.length > 0 ? list[0] : null
-    if (!f) return
-    if (!/\.(docx|pdf|xlsx)$/i.test(f.name)) {
-      onPick(null)
-      window.alert(`Ожидается DOCX, PDF или XLSX, получен «${f.name}».`)
-      return
-    }
-    onPick(f)
+    if (!disabled && list?.length) onAdd(Array.from(list))
   }
 
   return (
@@ -39,45 +53,54 @@ function FileZone({
         setOver(false)
         if (!disabled) take(e.dataTransfer.files)
       }}
-      className={`border border-dashed p-3 ${
-        over ? 'border-sky-600 bg-sky-50' : file ? 'border-emerald-500 bg-emerald-50' : 'border-slate-400 bg-slate-50'
+      className={`min-w-0 rounded-lg border border-dashed p-3 ${
+        over ? 'border-sky-600 bg-sky-50' : error ? 'border-rose-400 bg-rose-50/40' : files.length ? 'border-emerald-500 bg-emerald-50/60' : 'border-slate-400 bg-slate-50'
       } ${disabled ? 'opacity-60' : ''}`}
     >
-      <div className="text-sm font-semibold text-slate-900">{title}</div>
-      <div className="mt-0.5 text-xs text-slate-600">{hint}</div>
+      <div id={`${id}-title`} className="text-sm font-semibold text-slate-900">{title}</div>
+      <div id={`${id}-hint`} className="mt-0.5 text-xs leading-relaxed text-slate-600">{hint}</div>
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
-          className="border border-slate-400 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed"
+          aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
+          className="rounded-md border border-slate-400 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed"
         >
-          Выбрать файл
+          Добавить файлы
         </button>
-        {file ? (
-          <>
-            <span className="truncate font-mono text-xs text-emerald-900" title={file.name}>
-              {file.name}
-            </span>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => onPick(null)}
-              className="text-xs text-slate-500 underline hover:text-rose-700"
-            >
-              убрать
-            </button>
-          </>
-        ) : (
-          <span className="text-xs text-slate-500">файл не выбран — можно перетащить сюда</span>
-        )}
+        <span className="text-xs text-slate-500">или перетащите сюда</span>
       </div>
+
+      <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs text-slate-600" aria-live="polite">
+        <span>Файлов: <strong className="font-mono text-slate-800">{files.length}/{MAX_FILES}</strong></span>
+        <span className="font-mono">{formatBytes(totalBytes(files))}</span>
+      </div>
+      {files.length > 0 ? <ul aria-label={`${title}: выбранные файлы`} className="mt-2 max-h-60 space-y-2 overflow-y-auto">
+        {files.map((file, index) => <li key={fileKey(file)} className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="break-all text-xs font-medium leading-relaxed text-slate-800">{file.name}</p>
+            <p className="mt-0.5 font-mono text-[11px] text-slate-500">{formatBytes(file.size)}</p>
+          </div>
+          <button type="button" disabled={disabled} onClick={() => onRemove(index)}
+            aria-label={`Убрать ${file.name} — ${title}`}
+            className="shrink-0 rounded px-1 py-0.5 text-xs text-slate-500 underline underline-offset-2 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 disabled:cursor-not-allowed">
+            убрать
+          </button>
+        </li>)}
+      </ul> : <p className="mt-2 text-xs text-slate-500">Файлы пока не выбраны.</p>}
+      {error && <p id={`${id}-error`} role="alert" className="mt-3 text-xs font-medium leading-relaxed text-rose-700">{error}</p>}
 
       <input
         ref={inputRef}
         type="file"
+        multiple
+        disabled={disabled}
         accept=".docx,.pdf,.xlsx"
+        aria-labelledby={`${id}-title`}
+        aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
+        aria-invalid={!!error}
         className="hidden"
         onChange={(e) => {
           take(e.target.files)
@@ -99,15 +122,55 @@ export function UploadPanel({
   onDemo: () => void
   onExample: () => void
   onCountercheck: () => void
-  onFiles: (before: File, after: File) => void
+  onFiles: (before: File[], after: File[]) => void
 }) {
-  const [before, setBefore] = useState<File | null>(null)
-  const [after, setAfter] = useState<File | null>(null)
+  const [before, setBefore] = useState<File[]>([])
+  const [after, setAfter] = useState<File[]>([])
+  const [fileErrors, setFileErrors] = useState<Record<Side, string | null>>({ before: null, after: null })
   const [error, setError] = useState<string | null>(null)
 
+  function addFiles(side: Side, picked: File[]) {
+    if (busy) return
+    const current = side === 'before' ? before : after
+    const other = side === 'before' ? after : before
+    const known = new Set(current.map(fileKey))
+    const next = [...current]
+    for (const file of picked) {
+      const key = fileKey(file)
+      if (!known.has(key)) { known.add(key); next.push(file) }
+    }
+
+    const unsupported = picked.find((file) => !/\.(docx|pdf|xlsx)$/i.test(file.name))
+    const oversized = picked.find((file) => file.size > MAX_FILE_BYTES)
+    const reason = unsupported
+      ? `Файл «${unsupported.name}» не добавлен. Поддерживаются Word DOCX, текстовый PDF и XLSX.`
+      : oversized
+        ? `Файл «${oversized.name}» превышает 20 МБ. Уменьшите размер или выберите другой файл.`
+        : next.length > MAX_FILES
+          ? `В каждой редакции может быть не больше ${MAX_FILES} файлов. Уберите лишние файлы или добавьте меньшую подборку.`
+          : totalBytes([...next, ...other]) > MAX_TOTAL_BYTES
+            ? 'Общий размер обеих редакций превышает 100 МБ. Уберите лишние файлы или уменьшите их размер.'
+            : null
+
+    setError(null)
+    setFileErrors((previous) => ({ ...previous, [side]: reason ? `${reason} Ранее выбранные файлы сохранены; новая подборка не добавлена.` : null }))
+    if (reason) return
+    if (side === 'before') setBefore(next)
+    else setAfter(next)
+  }
+
+  function removeFile(side: Side, index: number) {
+    if (busy) return
+    if (side === 'before') setBefore((files) => files.filter((_, position) => position !== index))
+    else setAfter((files) => files.filter((_, position) => position !== index))
+    setFileErrors({ before: null, after: null })
+    setError(null)
+  }
+
   function submit() {
-    if (!before || !after) {
-      setError('Загрузите оба документа: «до» и «после». Либо запустите демо-комплект — он уже в репозитории.')
+    if (busy) return
+    if (!before.length || !after.length) {
+      setError('Добавьте хотя бы один файл в каждую редакцию: «до» и «после». Либо запустите демо-комплект.')
       return
     }
     setError(null)
@@ -119,30 +182,28 @@ export function UploadPanel({
       <header className="border-b border-slate-300 bg-slate-50 px-4 py-2.5">
         <h2 className="text-base font-semibold text-slate-900">Комплект документов для сравнения</h2>
         <p className="mt-0.5 text-xs text-slate-600">
-          DOCX, текстовый PDF или XLSX со столбцами «Подразделение» и «Функция». До 20 МБ на файл.
+          Word DOCX, текстовый PDF или XLSX со столбцами «Подразделение» и «Функция». До 5 файлов в каждой редакции, до 20 МБ на файл и до 100 МБ суммарно.
         </p>
       </header>
 
-      <div className="grid gap-3 px-4 py-3 lg:grid-cols-[1fr_1fr_minmax(260px,320px)]">
+      <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(260px,320px)]">
         <FileZone
-          title="Документ «до» реорганизации"
-          hint="Действующая редакция"
-          file={before}
+          title="Комплект «до» реорганизации"
+          hint="Действующая редакция: положение и приложения. Следующий выбор добавит файлы к списку."
+          files={before}
+          error={fileErrors.before}
           disabled={busy}
-          onPick={(f) => {
-            setBefore(f)
-            setError(null)
-          }}
+          onAdd={(files) => addFiles('before', files)}
+          onRemove={(index) => removeFile('before', index)}
         />
         <FileZone
-          title="Документ «после» реорганизации"
-          hint="Новая редакция"
-          file={after}
+          title="Комплект «после» реорганизации"
+          hint="Новая редакция: положение и приложения. Порядок файлов сохраняется при добавлении."
+          files={after}
+          error={fileErrors.after}
           disabled={busy}
-          onPick={(f) => {
-            setAfter(f)
-            setError(null)
-          }}
+          onAdd={(files) => addFiles('after', files)}
+          onRemove={(index) => removeFile('after', index)}
         />
 
         <div className="flex flex-col gap-2 border border-slate-800 bg-slate-800 p-3">
@@ -183,7 +244,8 @@ export function UploadPanel({
         >
           Проанализировать загруженные документы
         </button>
-        {error ? <span className="text-xs font-medium text-rose-700">{error}</span> : null}
+        <span className="text-xs text-slate-600" aria-live="polite">Всего файлов: {before.length + after.length} · {formatBytes(totalBytes([...before, ...after]))} из 100 МБ</span>
+        {error ? <span role="alert" className="text-xs font-medium text-rose-700">{error}</span> : null}
       </div>
     </div>
   )

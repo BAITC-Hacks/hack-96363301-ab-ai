@@ -1,4 +1,4 @@
-import type { AnalysisReport } from '../types'
+import type { AnalysisReport, DocMeta } from '../types'
 
 /** Плашка демо-режима (must have оценки: путь проходится без API-ключа). */
 export function ModeBanner({ mode }: { mode: 'live' | 'demo' }) {
@@ -35,7 +35,23 @@ export function FallbackBanner({ reason }: { reason: string }) {
   )
 }
 
-/** Шапка с паспортом сравниваемых документов. */
+function DocumentMetaCard({ document, label }: { document: DocMeta; label: string }) {
+  const files = document.documents?.length ? document.documents : [{ fileId: document.docId, name: document.name, clauses: document.clauses }]
+  return <div className="min-w-0 bg-white px-3 py-2">
+    <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+    <ul aria-label={`Файлы: ${label}`} className="mt-1 space-y-2">
+      {files.map((file) => <li key={file.fileId} className="min-w-0">
+        <p className="break-all font-medium text-slate-900">{file.name}</p>
+        {files.length > 1 && <p className="mt-0.5 font-mono text-[11px] text-slate-500">пунктов: {file.clauses}</p>}
+      </li>)}
+    </ul>
+    <div className="mt-1 font-mono text-xs text-slate-600">
+      {document.docId} · файлов: {files.length} · пунктов: {document.clauses}
+    </div>
+  </div>
+}
+
+/** Шапка с паспортом сравниваемых комплектов и именами исходных файлов. */
 export function MetaBar({ meta }: { meta: AnalysisReport['meta'] }) {
   const when = (() => {
     const d = new Date(meta.generatedAt)
@@ -43,26 +59,10 @@ export function MetaBar({ meta }: { meta: AnalysisReport['meta'] }) {
   })()
 
   return (
-    <div className="grid gap-px border border-slate-300 bg-slate-300 text-sm md:grid-cols-3">
-      <div className="bg-white px-3 py-2">
-        <div className="text-[11px] tracking-wide text-slate-500 uppercase">Документ «до»</div>
-        <div className="truncate font-medium text-slate-900" title={meta.before.name}>
-          {meta.before.name}
-        </div>
-        <div className="font-mono text-xs text-slate-600">
-          {meta.before.docId} · пунктов: {meta.before.clauses}
-        </div>
-      </div>
-      <div className="bg-white px-3 py-2">
-        <div className="text-[11px] tracking-wide text-slate-500 uppercase">Документ «после»</div>
-        <div className="truncate font-medium text-slate-900" title={meta.after.name}>
-          {meta.after.name}
-        </div>
-        <div className="font-mono text-xs text-slate-600">
-          {meta.after.docId} · пунктов: {meta.after.clauses}
-        </div>
-      </div>
-      <div className="bg-white px-3 py-2">
+    <div aria-label="Документы отчёта" className="grid gap-px border border-slate-300 bg-slate-300 text-sm md:grid-cols-3">
+      <DocumentMetaCard document={meta.before} label="Комплект «до»" />
+      <DocumentMetaCard document={meta.after} label="Комплект «после»" />
+      <div className="min-w-0 bg-white px-3 py-2">
         <div className="text-[11px] tracking-wide text-slate-500 uppercase">Отчёт сформирован</div>
         <div className="font-medium text-slate-900">{when}</div>
         <div className="font-mono text-xs text-slate-600">

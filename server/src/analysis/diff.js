@@ -1,5 +1,6 @@
 import { normalizeText } from './units.js';
 import { inspectMaterialChanges } from './material.js';
+import { sourceEvidence } from '../parse/evidence.js';
 
 /**
  * Сопоставление функций между редакциями и поиск дублирования.
@@ -68,14 +69,7 @@ function groupByClause(functions) {
 
 function evidence(entry, clauseIndex) {
   const clause = clauseIndex.get(entry.ref);
-  return [
-    {
-      ref: entry.ref,
-      docId: entry.docId,
-      number: entry.number,
-      text: clause ? clause.text : entry.text,
-    },
-  ];
+  return [sourceEvidence(clause || entry)];
 }
 
 /**
@@ -262,23 +256,23 @@ export function findNormativeGaps(unitDiff, functionsAfter, clauseIndex) {
   const gaps = [];
 
   for (const unit of unitDiff.filter((u) => u.status === 'created')) {
+    const own = functionsAfter.filter((f) => f.owner === (unit.abbr || unit.name));
+    const relevantFiles = new Set([...unit.evidence.filter((e) => e.docId === 'red9'), ...own.map((f) => clauseIndex.get(f.ref))].filter(Boolean).map((e) => e.fileId));
+    const relevantOrg = orgFunctions.filter((f) => relevantFiles.has(clauseIndex.get(f.ref)?.fileId));
+    if (!relevantOrg.length) continue; // A different document cannot establish this document's normative scope.
     const token = (unit.abbr || unit.name).toLowerCase();
-    const mentioned = orgFunctions.some((f) => f.text.toLowerCase().includes(token));
+    const mentioned = relevantOrg.some((f) => f.text.toLowerCase().includes(token));
     if (mentioned) continue;
 
-    const own = functionsAfter.filter((f) => f.owner === (unit.abbr || unit.name));
     gaps.push({
       title: `Требуется проверить описание функций подразделения «${unit.abbr || unit.name}»`,
       detail:
-        `Подразделение создано в редакции «после», однако раздел «Цели, задачи и функции внутреннего аудита» ` +
+        `Подразделение создано в редакции «после», однако раздел общих функций в связанных с ним документах ` +
         `его не упоминает. ` + (own.length
-          ? `Функции прослеживаются только через обязанности руководителя (${own.length} пунктов). `
+          ? `В извлечённом наборе есть ${own.length} пунктов функций или обязанностей этого подразделения. `
           : 'В извлечённом перечне не найдены функции этого подразделения. ') +
         `Требуется проверить полноту закрепления задач; отсутствие названия в разделе само по себе не доказывает нарушение.`,
-      evidence: own.length ? own.slice(0, 3).map((f) => {
-        const clause = clauseIndex.get(f.ref);
-        return { ref: f.ref, docId: f.docId, number: f.number, text: clause ? clause.text : f.text };
-      }) : [...new Map(unit.evidence.map((e) => [e.ref, e])).values()],
+      evidence: [...new Map([...unit.evidence, ...own.slice(0, 3).flatMap((f) => evidence(f, clauseIndex)), ...relevantOrg.slice(0, 1).flatMap((f) => evidence(f, clauseIndex))].map((e) => [e.ref, e])).values()],
     });
   }
 

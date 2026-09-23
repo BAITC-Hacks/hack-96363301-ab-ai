@@ -66,7 +66,8 @@ test('Подразделение без найденных функций мож
   const functions = [entry('red9#2', 'Блок', 'Выполняет аудит финансовой отчетности организации.', 'org')];
   const gaps = findNormativeGaps([unit], functions, indexOf(functions));
   assert.equal(gaps.length, 1);
-  assert.deepEqual(gaps[0].evidence, [creation]);
+  assert.deepEqual(gaps[0].evidence.map((e) => e.ref), [creation.ref, functions[0].ref]);
+  assert.deepEqual(gaps[0].evidence[0], creation);
   assert.match(gaps[0].detail, /не найдены функции/);
   const report = { meta: { before: {}, after: {} }, units: [unit], functions: [], gaps, conflicts: [], duplicates: [] };
   const plan = buildPlan(report);

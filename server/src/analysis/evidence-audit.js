@@ -24,6 +24,9 @@ export function auditReportEvidence(report, clauseIndex) {
         fail(path, `${label} источника «${item.ref}» не совпадает с результатом разбора`);
       }
     }
+    for (const field of ['fileId', 'fileName']) {
+      if (item[field] !== original[field]) fail(path, `поле ${field} источника «${item.ref}» не совпадает с исходным файлом`);
+    }
     checkedReferences += 1;
     sources.add(item.ref);
   };

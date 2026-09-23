@@ -110,15 +110,30 @@ export async function exportPlan(report, plan) {
     ['Осталось без решения или на согласовании', plan.stats.unresolved], ['Предложений о назначении', plan.stats.proposed],
     ['Статус', 'ПРОЕКТ — требует согласования'], ['Ограничение', plan.notice], ['Идентификатор комплекта', plan.fingerprint],
   ]);
+  const inventory = workbook.addWorksheet('Комплект документов');
+  inventory.columns = [{ header: 'Редакция', width: 16 }, { header: 'Имя файла', width: 70 },
+    { header: 'ID файла', width: 40 }, { header: 'Распознано пунктов', width: 24 }];
+  const documents = [];
+  for (const [side, label] of [['before', 'До'], ['after', 'После']]) {
+    const meta = report.meta[side];
+    const files = meta.documents?.length ? meta.documents : [{ fileId: meta.docId, name: meta.name, clauses: meta.clauses }];
+    for (const file of files) {
+      documents.push({ ...file, docId: meta.docId });
+      inventory.addRow([label, file.name, file.fileId, file.clauses]);
+    }
+  }
   const sources = workbook.addWorksheet('Источники');
-  sources.columns = [{ header: 'Ссылка', width: 25 }, { header: 'Документ', width: 60 }, { header: 'Пункт / строка', width: 30 }, { header: 'Точная цитата', width: 110 }];
+  sources.columns = [{ header: 'Ссылка', width: 25 }, { header: 'Документ', width: 60 }, { header: 'Пункт / строка', width: 30 }, { header: 'Точная цитата', width: 110 }, { header: 'ID файла', width: 40 }];
   const sourceRows = new Map();
   for (const e of uniqueEvidence([
     ...plan.cases.flatMap((c) => [...c.evidence, ...c.candidates.map((v) => v.evidence)]),
     ...report.functions.flatMap((f) => [...f.evidenceBefore, ...f.evidenceAfter]),
     ...(report.quality?.warnings || []).flatMap((w) => w.evidence),
+    ...report.units.flatMap((unit) => unit.evidence),
   ])) {
-    const row = sources.addRow([e.ref, e.docId === 'red8' ? report.meta.before.name : report.meta.after.name, e.number, e.text.slice(0, 32767)]);
+    const file = e.fileId ? documents.find((item) => item.docId === e.docId && item.fileId === e.fileId) : null;
+    const fileName = e.fileName || file?.name || (e.docId === 'red8' ? report.meta.before.name : report.meta.after.name);
+    const row = sources.addRow([e.ref, fileName, e.number, e.text.slice(0, 32767), e.fileId || '']);
     sourceRows.set(e.ref, row.number);
   }
   const decisions = new Map(plan.decisions.map((d) => [d.caseId, d]));
@@ -154,10 +169,10 @@ export async function exportPlan(report, plan) {
     const quality = workbook.addWorksheet('Качество анализа');
     quality.columns = [{ header: 'Категория', width: 24 }, { header: 'Документ / тип', width: 50 },
       { header: 'Показатель / вопрос', width: 55 }, { header: 'Значение / пояснение', width: 110 },
-      { header: 'Источники', width: 60 }, { header: 'Открыть источник', width: 28 }];
+      { header: 'Источники', width: 60 }, { header: 'Открыть источник', width: 28 }, { header: 'ID файла', width: 40 }];
     for (const doc of report.quality.documents) {
       for (const [label, value] of [['Распознано пунктов', doc.clauses], ['Подразделений', doc.units], ['Пунктов с функциями', doc.functionClauses], ['Связей функция–владелец', doc.ownerBindings], ['Пунктов без определённого подразделения', doc.unassignedClauses]])
-        quality.addRow(['Разбор', doc.name, label, value]);
+        quality.addRow(['Разбор', doc.name, label, value, '', '', doc.fileId || '']);
     }
     quality.addRow(['Источники', '', 'Проверено вхождений ссылок', report.quality.checkedReferences]);
     quality.addRow(['Источники', '', 'Уникальных источников', report.quality.uniqueSources]);
@@ -165,7 +180,8 @@ export async function exportPlan(report, plan) {
     for (const w of report.quality.warnings) {
       const refs = w.evidence.map((e) => e.ref);
       quality.addRow(['Ручная проверка', w.code, w.title, w.detail.slice(0, 32767), refs.join(', '),
-        refs.length ? { text: refs[0], hyperlink: `#'Источники'!A${sourceRows.get(refs[0])}` } : '']);
+        refs.length ? { text: refs[0], hyperlink: `#'Источники'!A${sourceRows.get(refs[0])}` } : '',
+        [...new Set(w.evidence.map((e) => e.fileId).filter(Boolean))].join(', ')]);
     }
   }
   workbook.eachSheet((s) => {
