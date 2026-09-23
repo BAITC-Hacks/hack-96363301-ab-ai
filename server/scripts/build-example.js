@@ -1,7 +1,10 @@
 import ExcelJS from 'exceljs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-for (const [source, prefix] of [['independent-example', 'example'], ['countercheck-example', 'countercheck']]) {
+for (const [source, prefix] of [['independent-example', 'example'], ['countercheck-example', 'countercheck'], ['semantic-example', 'semantic'], ['semantic-holdout', 'semantic_holdout'], ['semantic-blind', 'semantic_blind']]) {
+  if (process.argv.includes('--semantic-only') && !prefix.startsWith('semantic')) continue;
+  const only = process.argv.find(arg => arg.startsWith('--only='))?.slice('--only='.length);
+  if (only && only !== prefix) continue;
   const fixture = JSON.parse(await readFile(new URL(`../../fixtures/${source}.json`, import.meta.url), 'utf8'));
   for (const side of ['before', 'after']) {
     const workbook = new ExcelJS.Workbook();

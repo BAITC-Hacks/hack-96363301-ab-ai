@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 import { analyze } from '../src/pipeline.js';
 import { buildPlan, exportPlan } from '../src/planning.js';
 import { app } from '../src/index.js';
+import { listenTestServer } from '../test-support/http-server.js';
 process.env.OPENAI_API_KEY = '';
 
 const beforeBuffer = await readFile(new URL('../../data/countercheck_before.xlsx', import.meta.url));
@@ -68,8 +69,7 @@ test('Excel выгружает контрпроверку с буквальны�
 });
 
 test('Демонстрация и загрузка тех же скачиваемых документов дают одинаковые находки', async (t) => {
-  const server = app.listen(0, '127.0.0.1');
-  await new Promise((resolve) => server.once('listening', resolve));
+  const server = await listenTestServer(app);
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
   const response = await fetch(`${base}/api/analyze/countercheck`, { method: 'POST' });

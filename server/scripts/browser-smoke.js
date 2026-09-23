@@ -13,12 +13,14 @@ const errors = [];
 let exportStatus = null;
 let uploadResponse = null;
 let exampleResponse = null;
+let semanticResponse = null;
 socket.onmessage = ({ data }) => {
   const message = JSON.parse(data);
   if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.text);
   if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/api/plan/export')) exportStatus = message.params.response.status;
   if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/api/analyze')) uploadResponse = { requestId: message.params.requestId, status: message.params.response.status };
   if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/api/analyze/example')) exampleResponse = { requestId: message.params.requestId, status: message.params.response.status };
+  if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/api/analyze/semantic')) semanticResponse = { requestId: message.params.requestId, status: message.params.response.status };
   const callback = pending.get(message.id);
   if (callback) { pending.delete(message.id); message.error ? callback.reject(message.error) : callback.resolve(message.result); }
 };
@@ -257,8 +259,62 @@ try {
     const screenshot = await send('Page.captureScreenshot', { format: 'png' });
     await writeFile(new URL('../../docs/screenshots/12-document-collection.png', import.meta.url), Buffer.from(screenshot.data, 'base64'));
   }
+  await evaluate(`document.querySelector('input[type="file"]').closest('details').open = true; [...document.querySelectorAll('button')].find(button => button.textContent === 'Найти переформулировки').click()`);
+  await until(`document.querySelector('#semantic-review')?.dataset.status === 'completed'`);
+  assert.equal(semanticResponse?.status, 200);
+  const semanticBody = await send('Network.getResponseBody', { requestId: semanticResponse.requestId });
+  const semanticReport = JSON.parse(semanticBody.base64Encoded ? Buffer.from(semanticBody.body, 'base64').toString('utf8') : semanticBody.body);
+  const review = semanticReport.semanticReview;
+  const proposals = review.items.filter(item => ['candidate', 'meaning_changed'].includes(item.status));
+  assert.ok(proposals.length > 0, 'Учебный комплект должен дать пары для просмотра');
+  assert.equal(await evaluate(`document.querySelector('#semantic-review').dataset.source`), review.source);
+  assert.equal(await evaluate(`Number(document.querySelector('[data-semantic-metric="proposals"]').textContent)`), proposals.length);
+  assert.equal(semanticReport.functions.filter(item => item.change === 'lost').length, 8, 'Гипотезы не скрывают исходные кандидаты на утрату');
+  for (const item of proposals) {
+    const selector = `[data-before-ref="${item.beforeRef}"]`;
+    assert.equal(await evaluate(`document.querySelector(${JSON.stringify(selector)}).dataset.semanticStatus`), item.status);
+    for (const fragment of [item.beforeFragment, item.afterFragment])
+      assert.ok(await evaluate(`document.querySelector(${JSON.stringify(selector)}).textContent.includes(${JSON.stringify(fragment)})`));
+    await evaluate(`document.querySelector(${JSON.stringify(selector)}).querySelector('details').open = true`);
+    for (const evidence of [item.evidenceBefore, item.evidenceAfter])
+      assert.ok(await evaluate(`document.querySelector(${JSON.stringify(selector)}).textContent.includes(${JSON.stringify(evidence.text)})`));
+  }
+  await evaluate(`document.querySelectorAll('#semantic-review details').forEach(details => { details.open = false; })`);
+  const changed = proposals.filter(item => item.status === 'meaning_changed');
+  if (changed.length) {
+    await evaluate(`[...document.querySelectorAll('#semantic-review button')].find(button => button.textContent.includes('Признаки изменения смысла')).click()`);
+    assert.equal(await evaluate(`document.querySelectorAll('#semantic-review [data-semantic-status="candidate"]').length`), 0);
+    assert.equal(await evaluate(`document.querySelectorAll('#semantic-review [data-semantic-status="meaning_changed"]').length`), changed.length);
+    await evaluate(`[...document.querySelectorAll('#semantic-review button')].find(button => button.textContent.includes('Все предложения')).click()`);
+  }
+  await until(`[...document.querySelectorAll('button')].some(button => button.textContent.includes('Выгрузить план в Excel') && !button.disabled)`);
+  exportStatus = null;
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent.includes('Выгрузить план в Excel')).click()`);
+  await until(`document.querySelector('#reorganization-lab').textContent.includes('Excel сформирован:')`);
+  assert.equal(exportStatus, 200);
+  for (const side of ['before', 'after']) {
+    const download = await fetch(new URL(`/api/examples/semantic/${side}.xlsx`, appUrl));
+    assert.equal(download.status, 200);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(Buffer.from(await download.arrayBuffer()));
+    assert.equal(workbook.worksheets[0].rowCount, 9);
+  }
+  for (const [width, height, name] of [[1440, 1100, '13-semantic-review.png'], [390, 844, '14-semantic-mobile.png']]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 500 });
+    await evaluate(`document.documentElement.style.scrollBehavior = 'auto'; document.querySelector('#semantic-review').scrollIntoView({behavior:'instant'})`);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    assert.ok(await evaluate(`document.querySelector('#semantic-review').getBoundingClientRect().right <= innerWidth`));
+    assert.ok(await evaluate(`document.querySelector('#semantic-review').scrollWidth <= document.querySelector('#semantic-review').clientWidth + 1`));
+    const layout = await evaluate(`({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth,
+      overflow: [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 1).slice(0, 12).map(e => ({ tag: e.tagName, id: e.id, className: e.className, right: e.getBoundingClientRect().right })) })`);
+    assert.ok(layout.scroll <= layout.width + 1, 'Горизонтальное переполнение: ' + JSON.stringify(layout));
+    if (process.argv.includes('--semantic-screenshots') || process.argv.includes('--screenshots')) {
+      const shot = await send('Page.captureScreenshot', { format: 'png' });
+      await writeFile(new URL(`../../docs/screenshots/${name}`, import.meta.url), Buffer.from(shot.data, 'base64'));
+    }
+  }
   assert.deepEqual(errors, []);
-  console.log('PASS: карта, решения, восстановление, демо, контрпроверка, источники и экспорт; загрузка XLSX, паспорт неполного анализа; комплекты 2+2, удаление/добавление файлов, четыре файла в паспорте и точные имена цитат. Ошибок JavaScript нет.');
+  console.log('PASS: карта, решения, восстановление, демо, контрпроверка, источники и экспорт; загрузка XLSX, паспорт неполного анализа; комплекты 2+2 и имена цитат; смысловой поиск, фильтры, обе цитаты, Excel, загрузка примеров, экран 390 px. Ошибок JavaScript нет.');
 } finally {
   await fetch(`http://127.0.0.1:9333/json/close/${target.id}`);
   socket.close();

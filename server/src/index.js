@@ -72,7 +72,17 @@ app.post('/api/analyze/example', async (_req, res) => {
 for (const side of ['before', 'after']) {
   app.get(`/api/examples/${side}.xlsx`, (_req, res) => res.download(join(DATA_DIR, `example_${side}.xlsx`)));
   app.get(`/api/examples/countercheck/${side}.xlsx`, (_req, res) => res.download(join(DATA_DIR, `countercheck_${side}.xlsx`)));
+  app.get(`/api/examples/semantic/${side}.xlsx`, (_req, res) => res.download(join(DATA_DIR, `semantic_${side}.xlsx`)));
 }
+
+app.post('/api/analyze/semantic', async (_req, res) => {
+  try {
+    res.json(rememberReport(await analyze({
+      beforeBuffer: await readFile(join(DATA_DIR, 'semantic_before.xlsx')), beforeName: 'Поиск переформулировок — до.xlsx',
+      afterBuffer: await readFile(join(DATA_DIR, 'semantic_after.xlsx')), afterName: 'Поиск переформулировок — после.xlsx',
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.post('/api/analyze/countercheck', async (_req, res) => {
   try {

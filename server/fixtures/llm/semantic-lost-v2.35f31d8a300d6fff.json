@@ -1,0 +1,60 @@
+{
+  "items": [
+    {
+      "id": "s0",
+      "afterRef": "red9#s1.r4",
+      "relation": "equivalent",
+      "beforeFragment": "Регистрирует все заключённые договоры в едином реестре.",
+      "afterFragment": "Учитывает каждое заключённое соглашение в общем перечне."
+    },
+    {
+      "id": "s1",
+      "afterRef": "red9#s1.r8",
+      "relation": "equivalent",
+      "beforeFragment": "Проверяет соблюдение поставщиками условий заключённых договоров.",
+      "afterFragment": "Контролирует выполнение контрагентами обязательств по соглашениям о поставках."
+    },
+    {
+      "id": "s2",
+      "afterRef": "red9#s1.r6",
+      "relation": "equivalent",
+      "beforeFragment": "Принимает и регистрирует обращения клиентов о неисправностях связи.",
+      "afterFragment": "Заносит поступившие от абонентов сообщения о сбоях телекоммуникационных услуг в журнал заявок."
+    },
+    {
+      "id": "s3",
+      "afterRef": "red9#s1.r7",
+      "relation": "changed",
+      "beforeFragment": "Уполномочен утверждать заявки на закупку оборудования.",
+      "afterFragment": "Подразделению запрещено одобрять запросы на приобретение техники."
+    },
+    {
+      "id": "s4",
+      "afterRef": "red9#s1.r2",
+      "relation": "changed",
+      "beforeFragment": "Ежемесячно проверяет остатки на банковских счетах предприятия.",
+      "afterFragment": "Раз в квартал сверяет денежные средства компании с выписками банка."
+    },
+    {
+      "id": "s5",
+      "afterRef": "red9#s1.r5",
+      "relation": "changed",
+      "beforeFragment": "Обязан проводить инструктаж по охране труда для новых работников.",
+      "afterFragment": "Вправе организовывать обучение безопасности трудовой деятельности для недавно принятых сотрудников."
+    },
+    {
+      "id": "s6",
+      "afterRef": null,
+      "relation": "none",
+      "beforeFragment": null,
+      "afterFragment": null
+    },
+    {
+      "id": "s7",
+      "afterRef": null,
+      "relation": "none",
+      "beforeFragment": null,
+      "afterFragment": null
+    }
+  ]
+}

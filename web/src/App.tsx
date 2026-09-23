@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { analyzeDemo, analyzeFiles, analyzeExample, analyzeCountercheck } from './api'
+import { analyzeDemo, analyzeFiles, analyzeExample, analyzeCountercheck, analyzeSemantic } from './api'
 import type { AnalyzeResult } from './api'
 import { FallbackBanner, MetaBar, ModeBanner } from './components/Banners'
 import { ConclusionSection } from './components/ConclusionSection'
@@ -12,11 +12,13 @@ import { UploadPanel } from './components/UploadPanel'
 import { ReportSummary } from './components/ReportSummary'
 import { ReorganizationLab } from './components/ReorganizationLab'
 import { QualityPassport } from './components/QualityPassport'
+import { SemanticReview } from './components/SemanticReview'
 
 const NAV = [
   { id: 'reorganization-lab', label: 'План реорганизации' },
   { id: 'units', label: '01 Подразделения' },
   { id: 'functions', label: '02 Функции' },
+  { id: 'semantic-review', label: 'Поиск переформулировок' },
   { id: 'overlap', label: '03 Дублирование и КИ' },
   { id: 'gaps', label: '04 Пробелы' },
   { id: 'conclusion', label: '05 Заключение' },
@@ -56,7 +58,9 @@ export default function App() {
   const report = result?.report ?? null
   useEffect(() => {
     if (report) {
-      const target = report.quality?.documents.some((doc) => doc.unassignedClauses > 0) ? 'analysis-quality' : 'reorganization-lab'
+      const semanticCandidates = report.semanticReview?.items.some((item) => item.status === 'candidate' || item.status === 'meaning_changed')
+      const target = report.quality?.documents.some((doc) => doc.unassignedClauses > 0)
+        ? 'analysis-quality' : semanticCandidates ? 'semantic-review' : 'reorganization-lab'
       document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [report])
@@ -73,7 +77,7 @@ export default function App() {
         </div>
         {report ? (
           <nav className="mt-2 flex flex-wrap gap-1 border-t border-slate-700 pt-2">
-            {NAV.map((n) => (
+            {NAV.filter((n) => n.id !== 'semantic-review' || report.semanticReview).map((n) => (
               <a
                 key={n.id}
                 href={`#${n.id}`}
@@ -93,6 +97,7 @@ export default function App() {
           onDemo={() => void run('Контрольный комплект: редакция 8 → редакция 9', analyzeDemo)}
           onExample={() => void run('Независимый учебный пример: переименование, перенос, утрата и пересечение функций', analyzeExample)}
           onCountercheck={() => void run('Контрпроверка: небольшие изменения формулировок в учебном примере', analyzeCountercheck)}
+          onSemantic={() => void run('Синтетический пример: поиск возможных переформулировок моделью и проверка источников', analyzeSemantic)}
           onFiles={(b, a) => void run(`Комплект: ${b.length} до → ${a.length} после`, () => analyzeFiles(b, a))}
         />
       </details>
@@ -104,7 +109,7 @@ export default function App() {
         <div className="border border-slate-300 bg-white px-6 py-10 text-center">
           <p className="text-sm font-semibold text-slate-900">Отчёт ещё не сформирован</p>
           <p className="mx-auto mt-1 max-w-2xl text-sm text-slate-600">
-            Загрузите два документа (DOCX, PDF, XLSX) — редакции «до» и «после» — или нажмите
+            Загрузите два комплекта (DOCX, PDF, XLSX) — редакции «до» и «после» — или нажмите
             <span className="mx-1 font-semibold text-slate-900">«Проанализировать демо-комплект»</span>: агент
             разберёт контрольный комплект организатора и покажет реорганизацию подразделений, перенос и потерю
             функций, дублирование и конфликт интересов — каждый вывод со ссылкой на пункт документа.
@@ -124,6 +129,7 @@ export default function App() {
           <div className="space-y-4">
             <div className="space-y-4">
               <UnitsSection units={report.units} />
+              {report.semanticReview && <SemanticReview key={report.meta.reportId || report.meta.generatedAt} review={report.semanticReview} />}
               <FunctionsSection functions={report.functions} />
               <OverlapSection duplicates={report.duplicates} conflicts={report.conflicts} />
               <GapsSection gaps={report.gaps} />

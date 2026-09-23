@@ -183,3 +183,92 @@ test('Предупреждения о качестве требуют точны
   delete report.quality;
   assert.doesNotThrow(() => auditReportEvidence(report, clauseIndex));
 });
+
+function semanticFixture(status = 'candidate') {
+  const { report, clauseIndex } = fixture();
+  const before = report.functions[0].evidenceBefore[0];
+  const after = report.functions[0].evidenceAfter[0];
+  report.functions[0] = { ...report.functions[0], change: 'lost', ownerBefore: 'ОК', ownerAfter: null, evidenceAfter: [], materialChanges: [] };
+  report.functions.push({ change: 'added', ownerBefore: null, ownerAfter: 'ОА', evidenceBefore: [], evidenceAfter: [after] });
+  const paired = ['candidate', 'meaning_changed'].includes(status);
+  report.semanticReview = {
+    status: status === 'unreviewed' ? 'unavailable' : 'completed', source: status === 'unreviewed' ? 'none' : 'fixture',
+    model: 'fixture-model', totalLost: 1, reviewed: status === 'unreviewed' ? 0 : 1, afterConsidered: 1, afterTotal: 1, limited: false,
+    items: [{
+      beforeRef: before.ref, ownerBefore: 'ОК', status, ownerAfter: paired ? 'ОА' : null,
+      evidenceBefore: before, evidenceAfter: paired ? after : null,
+      beforeFragment: paired ? 'не согласовывает договоры' : null,
+      afterFragment: paired ? 'согласовывает договоры' : null,
+      similarity: paired ? 0.7 : null, materialChanges: paired ? [{
+        kind: 'prohibition', title: 'Изменено отрицание', detail: 'Проверить полномочие.',
+        beforeFragment: 'не согласовывает', afterFragment: 'согласовывает',
+      }] : [],
+    }],
+  };
+  return { report, clauseIndex };
+}
+
+test('Смысловые гипотезы проверяют обе цитаты, а непроверенные функции сохраняют аудит источника до', () => {
+  for (const status of ['candidate', 'meaning_changed', 'not_found', 'unreviewed']) {
+    const { report, clauseIndex } = semanticFixture(status);
+    const original = JSON.stringify(report);
+    const without = structuredClone(report);
+    delete without.semanticReview;
+    const baseline = auditReportEvidence(without, clauseIndex);
+    const actual = auditReportEvidence(report, clauseIndex);
+    assert.equal(actual.checkedReferences, baseline.checkedReferences + (['candidate', 'meaning_changed'].includes(status) ? 2 : 1));
+    assert.equal(actual.uniqueSources, baseline.uniqueSources);
+    assert.equal(JSON.stringify(report), original);
+    report.semanticReview.items[0].evidenceBefore = { ...report.semanticReview.items[0].evidenceBefore, text: 'Придуманная цитата' };
+    assert.throws(() => auditReportEvidence(report, clauseIndex), /semanticReview\.items\[0\]\.evidenceBefore.*текст цитаты/);
+  }
+});
+
+test('Смысловая пара требует исходную потерянную функцию и распознанную функцию после с локальными владельцами', () => {
+  const corruptions = {
+    'before-ref': (report) => { report.semanticReview.items[0].beforeRef = 'before/unit'; },
+    'not-lost': (report) => { report.functions[0].change = 'kept'; report.functions[0].evidenceAfter = report.functions[1].evidenceAfter; },
+    'orphan-after': (report) => {
+      const item = report.semanticReview.items[0];
+      item.evidenceAfter = report.functions[0].reviewCandidates[0].evidence;
+      item.afterFragment = 'контролирует исполнение';
+    },
+    'wrong-edition': (report) => { report.semanticReview.items[0].evidenceAfter = report.semanticReview.items[0].evidenceBefore; },
+    'before-owner': (report) => { report.semanticReview.items[0].ownerBefore = 'Выдуманный отдел'; },
+    'after-owner': (report) => { report.semanticReview.items[0].ownerAfter = 'Выдуманный отдел'; },
+    duplicate: (report) => { report.semanticReview.items.push(structuredClone(report.semanticReview.items[0])); },
+  };
+  for (const [name, corrupt] of Object.entries(corruptions)) {
+    const { report, clauseIndex } = semanticFixture();
+    corrupt(report);
+    assert.throws(() => auditReportEvidence(report, clauseIndex), /semanticReview\.items\[/, name);
+  }
+});
+
+test('Смысловая проверка не допускает неполную пару, подменённые фрагменты или сигналы без точных цитат', () => {
+  for (const [field, value] of [
+    ['evidenceBefore', null], ['evidenceAfter', null], ['beforeFragment', ''], ['afterFragment', '  '],
+    ['beforeFragment', 'НЕ согласовывает'], ['afterFragment', 'не согласовывает'],
+    ['similarity', null], ['similarity', NaN], ['similarity', 1.1], ['status', 'confirmed'],
+  ]) {
+    const { report, clauseIndex } = semanticFixture();
+    report.semanticReview.items[0][field] = value;
+    assert.throws(() => auditReportEvidence(report, clauseIndex), /semanticReview\.items\[0\]/, field);
+  }
+  for (const field of ['beforeFragment', 'afterFragment']) {
+    const { report, clauseIndex } = semanticFixture('meaning_changed');
+    report.semanticReview.items[0].materialChanges[0][field] = 'Выдуманный фрагмент';
+    assert.throws(() => auditReportEvidence(report, clauseIndex), /materialChanges\[0\]/, field);
+  }
+});
+
+test('Отсутствие смысловой пары не допускает скрытых источников, владельцев, сходства или контрпроверки', () => {
+  for (const status of ['not_found', 'unreviewed']) {
+    for (const field of ['evidenceAfter', 'ownerAfter', 'beforeFragment', 'afterFragment', 'similarity', 'materialChanges']) {
+      const { report, clauseIndex } = semanticFixture(status);
+      const pair = semanticFixture().report.semanticReview.items[0];
+      report.semanticReview.items[0][field] = pair[field];
+      assert.throws(() => auditReportEvidence(report, clauseIndex), /semanticReview\.items\[0\]/, `${status}: ${field}`);
+    }
+  }
+});

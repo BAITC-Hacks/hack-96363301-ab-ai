@@ -6,6 +6,7 @@ import { explainChanges, buildConclusion, hasApiKey } from './llm/enrich.js';
 import { AnalysisReport } from './types.js';
 import { buildCoverage } from './analysis/quality.js';
 import { auditReportEvidence } from './analysis/evidence-audit.js';
+import { reviewLostFunctions } from './llm/semantic.js';
 
 /**
  * Пайплайн анализа двух комплектов с сохранением границ исходных файлов.
@@ -69,12 +70,14 @@ export async function analyze({ beforeBuffer, beforeName, afterBuffer, afterName
 
   const explained = await explainChanges(functions, clauseIndex);
   if (explained.step) trace.push(explained.step);
+  const semantic = await reviewLostFunctions({ functions, functionsBefore, functionsAfter, clauseIndex });
+  if (semantic.step) trace.push(semantic.step);
 
   const quality = buildCoverage([
     ...before.documents.map((doc) => ({ doc, units: unitsBefore, functions: functionsBefore.filter((f) => doc.clauses.some((c) => c.id === f.ref)), name: doc.fileName })),
     ...after.documents.map((doc) => ({ doc, units: unitsAfter, functions: functionsAfter.filter((f) => doc.clauses.some((c) => c.id === f.ref)), name: doc.fileName })),
   ]);
-  const draft = { units, functions: explained.functions, duplicates, conflicts, gaps, quality };
+  const draft = { units, functions: explained.functions, duplicates, conflicts, gaps, quality, semanticReview: semantic.review };
   const { conclusion, step } = await buildConclusion(draft);
   trace.push(step);
 

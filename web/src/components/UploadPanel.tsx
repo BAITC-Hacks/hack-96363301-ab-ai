@@ -116,12 +116,14 @@ export function UploadPanel({
   onDemo,
   onExample,
   onCountercheck,
+  onSemantic,
   onFiles,
 }: {
   busy: boolean
   onDemo: () => void
   onExample: () => void
   onCountercheck: () => void
+  onSemantic: () => void
   onFiles: (before: File[], after: File[]) => void
 }) {
   const [before, setBefore] = useState<File[]>([])
@@ -232,6 +234,11 @@ export function UploadPanel({
             Найти скрытые изменения
           </button>
           <p className="text-[11px] text-slate-300">Одно слово меняет обязанность. Учебный пример для контрпроверки. Скачать XLSX: <a className="underline" href="/api/examples/countercheck/before.xlsx">до</a> · <a className="underline" href="/api/examples/countercheck/after.xlsx">после</a>.</p>
+          <button type="button" disabled={busy} onClick={onSemantic}
+            className="mt-1 rounded-lg bg-cyan-300 px-3 py-2.5 text-sm font-bold text-cyan-950 hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:opacity-50">
+            Найти переформулировки
+          </button>
+          <p className="text-[11px] leading-snug text-slate-300">Синтетический пример: разные слова, возможная общая обязанность. Поиск моделью предлагает пары для проверки. Скачать XLSX: <a className="underline" href="/api/examples/semantic/before.xlsx">до</a> · <a className="underline" href="/api/examples/semantic/after.xlsx">после</a>.</p>
         </div>
       </div>
 

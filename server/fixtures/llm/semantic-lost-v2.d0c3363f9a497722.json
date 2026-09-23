@@ -1,0 +1,60 @@
+{
+  "items": [
+    {
+      "id": "s0",
+      "afterRef": "red9#s1.r3",
+      "relation": "equivalent",
+      "beforeFragment": "Ведёт реестр выданных доверенностей.",
+      "afterFragment": "Регистрирует выданные доверенности."
+    },
+    {
+      "id": "s1",
+      "afterRef": "red9#s1.r9",
+      "relation": "equivalent",
+      "beforeFragment": "Сообщает заявителям решения по их заявлениям.",
+      "afterFragment": "Извещает авторов заявлений о принятых по ним решениях."
+    },
+    {
+      "id": "s2",
+      "afterRef": "red9#s1.r6",
+      "relation": "equivalent",
+      "beforeFragment": "Проверяет правильность расчёта заработной платы работников.",
+      "afterFragment": "Контролирует корректность вычисления зарплаты персоналу."
+    },
+    {
+      "id": "s3",
+      "afterRef": "red9#s1.r8",
+      "relation": "changed",
+      "beforeFragment": "Не передаёт журналы доступа подрядным организациям.",
+      "afterFragment": "Вправе предоставлять подрядчикам журналы доступа."
+    },
+    {
+      "id": "s4",
+      "afterRef": "red9#s1.r5",
+      "relation": "changed",
+      "beforeFragment": "Ежемесячно направляет отчёт об инцидентах в службу безопасности.",
+      "afterFragment": "Раз в квартал пересылает службе безопасности отчёт об инцидентах."
+    },
+    {
+      "id": "s5",
+      "afterRef": "red9#s1.r2",
+      "relation": "changed",
+      "beforeFragment": "Проверяет соблюдение требований охраны труда во всех филиалах.",
+      "afterFragment": "Оценивает выполнение правил охраны труда только в филиалах северного региона."
+    },
+    {
+      "id": "s6",
+      "afterRef": null,
+      "relation": "none",
+      "beforeFragment": null,
+      "afterFragment": null
+    },
+    {
+      "id": "s7",
+      "afterRef": null,
+      "relation": "none",
+      "beforeFragment": null,
+      "afterFragment": null
+    }
+  ]
+}

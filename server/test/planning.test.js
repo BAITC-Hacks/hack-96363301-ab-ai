@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 import { analyze } from '../src/pipeline.js';
 import { buildPlan, exportPlan, rememberReport, storedReport, PlanRequest } from '../src/planning.js';
 import { app } from '../src/index.js';
+import { listenTestServer } from '../test-support/http-server.js';
 process.env.OPENAI_API_KEY = '';
 const report = await analyze({
   beforeBuffer: await readFile(new URL('../../data/example_before.xlsx', import.meta.url)), beforeName: 'before.xlsx',
@@ -47,8 +48,10 @@ test('Отпечаток комплекта устойчив к повторно
 
 test('Excel содержит решения, источник, гиперссылку и проект; строки не становятся формулами', async () => {
   const plan = buildPlan(report, [{ ...decision, note: '=HYPERLINK("https://example.invalid", "plain text")' }]);
+  const legacy = { ...report };
+  delete legacy.semanticReview;
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(await exportPlan(report, plan));
+  await workbook.xlsx.load(await exportPlan(legacy, plan));
   assert.deepEqual(workbook.worksheets.map((s) => s.name), ['Обзор', 'Комплект документов', 'Источники', 'План решений', 'Сопоставление функций', 'Качество анализа']);
   const sheet = workbook.getWorksheet('План решений');
   assert.equal(sheet.getCell('E2').text, 'ОА');
@@ -57,6 +60,93 @@ test('Excel содержит решения, источник, гиперссы�
   assert.match(sheet.getCell('I2').text, /Проект решения/);
   const source = workbook.getWorksheet('Источники');
   assert.equal(source.getCell('D2').text, lost.evidence[0].text);
+});
+
+function withSemanticReview(status = 'candidate', source = 'fixture') {
+  const reviewed = structuredClone(report);
+  const before = reviewed.functions.find((fn) => fn.change === 'lost');
+  const after = reviewed.functions.find((fn) => fn.evidenceAfter.length);
+  const paired = ['candidate', 'meaning_changed'].includes(status);
+  reviewed.semanticReview = {
+    status: status === 'unreviewed' ? 'unavailable' : 'completed', source: status === 'unreviewed' ? 'none' : source,
+    model: 'fixture-model', totalLost: 1, reviewed: status === 'unreviewed' ? 0 : 1, afterConsidered: 1, afterTotal: 10, limited: true,
+    items: [{
+      beforeRef: before.evidenceBefore[0].ref, ownerBefore: before.ownerBefore, status,
+      ownerAfter: paired ? after.ownerAfter : null, evidenceBefore: before.evidenceBefore[0], evidenceAfter: paired ? after.evidenceAfter[0] : null,
+      beforeFragment: paired ? before.evidenceBefore[0].text : null, afterFragment: paired ? after.evidenceAfter[0].text : null,
+      similarity: paired ? 0.25 : null, materialChanges: paired ? [{
+        kind: 'scope', title: 'Проверить охват', detail: 'Требуется сопоставить объекты действия.',
+        beforeFragment: before.evidenceBefore[0].text, afterFragment: after.evidenceAfter[0].text,
+      }] : [],
+    }],
+  };
+  return reviewed;
+}
+
+test('Смысловые гипотезы не меняют находки плана, сохранённые решения, классификацию или отпечаток', () => {
+  const original = JSON.stringify(report.functions);
+  const baseline = buildPlan(report, [decision]);
+  for (const status of ['candidate', 'meaning_changed', 'not_found', 'unreviewed']) {
+    const reviewed = withSemanticReview(status);
+    assert.deepEqual(buildPlan(reviewed, [decision]), baseline, status);
+    assert.equal(JSON.stringify(reviewed.functions), original, status);
+  }
+});
+
+test('Excel отделяет смысловые гипотезы, сохраняет обе точные цитаты и работающие ссылки на источники', async () => {
+  for (const source of ['api', 'fixture']) {
+    const reviewed = withSemanticReview('candidate', source);
+    const item = reviewed.semanticReview.items[0];
+    const original = JSON.stringify(reviewed);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await exportPlan(reviewed, buildPlan(reviewed, [decision])));
+    const sheet = workbook.getWorksheet('Смысловая проверка');
+    assert.equal(sheet.getCell('A2').text, 'Кандидат — требуется проверка');
+    assert.equal(sheet.getCell('B2').text, item.ownerBefore);
+    assert.equal(sheet.getCell('C2').text, item.ownerAfter);
+    assert.equal(sheet.getCell('D2').text, item.beforeFragment);
+    assert.equal(sheet.getCell('E2').text, item.afterFragment);
+    assert.equal(sheet.getCell('H2').text, '25%');
+    assert.match(sheet.getCell('H1').text, /не уверенность/);
+    assert.match(sheet.getCell('I2').text, /Проверить охват/);
+    assert.equal(sheet.getCell('J2').text, source);
+    assert.equal(sheet.getCell('K2').text, 'fixture-model');
+    assert.match(sheet.getCell('L2').text, /1 из 10/);
+    assert.match(sheet.getCell('L2').text, /Область поиска ограничена/);
+    assert.match(sheet.getCell('L2').text, /Отсутствие пары не доказывает утрату/);
+    for (const [cell, evidence] of [['F2', item.evidenceBefore], ['G2', item.evidenceAfter]]) {
+      const value = sheet.getCell(cell).value;
+      const match = /^#'Источники'!A(\d+)$/u.exec(value.hyperlink);
+      assert.ok(match, 'each edition must link to a source row');
+      const sourceRow = workbook.getWorksheet('Источники').getRow(Number(match[1]));
+      assert.equal(sourceRow.getCell(1).text, evidence.ref);
+      assert.equal(sourceRow.getCell(4).text, evidence.text);
+    }
+    assert.equal(JSON.stringify(reviewed), original, 'export does not resolve hypotheses or mutate the report');
+  }
+});
+
+test('Excel различает изменение смысла, отсутствие найденной пары и непроверенные функции', async () => {
+  for (const [status, expected] of [
+    ['meaning_changed', 'Возможно изменение смысла'],
+    ['not_found', 'Пара не найдена в просмотренных пунктах'], ['unreviewed', 'Не проверено'],
+  ]) {
+    const reviewed = withSemanticReview(status);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await exportPlan(reviewed, buildPlan(reviewed)));
+    const sheet = workbook.getWorksheet('Смысловая проверка');
+    assert.equal(sheet.getCell('A2').text, expected);
+    if (status !== 'meaning_changed') {
+      for (const cell of ['C2', 'D2', 'E2', 'G2', 'H2', 'I2']) assert.equal(sheet.getCell(cell).text, '', cell);
+      assert.ok(sheet.getCell('F2').value.hyperlink, 'unpaired rows retain the source before');
+    }
+    assert.equal(sheet.getCell('J2').text, status === 'unreviewed' ? 'none' : 'fixture');
+  }
+  const withoutLost = withSemanticReview();
+  withoutLost.semanticReview = { ...withoutLost.semanticReview, totalLost: 0, items: [] };
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await exportPlan(withoutLost, buildPlan(withoutLost)));
+  assert.equal(workbook.getWorksheet('Смысловая проверка'), undefined);
 });
 
 test('Excel сохраняет фактические имена файлов, состав многодокументного комплекта и адреса источников', async () => {
@@ -147,8 +237,7 @@ test('Хранилище ограничено; клиент не может по
   const first = rememberReport(report);
   for (let i = 0; i < 20; i++) rememberReport(report);
   assert.throws(() => storedReport(first.meta.reportId), /Сессия/);
-  const server = app.listen(0, '127.0.0.1');
-  await new Promise((resolve) => server.once('listening', resolve));
+  const server = await listenTestServer(app);
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
   const analyzed = await (await fetch(`${base}/api/analyze/example`, { method: 'POST' })).json();

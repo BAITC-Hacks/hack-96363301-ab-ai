@@ -1,0 +1,429 @@
+{
+  "generatedAt": "2026-09-23T12:19:04.607Z",
+  "mode": "live",
+  "limitation": "24 синтетических случая: 16 регрессионных после разбора первого прогона и 8 новых, размеченных отдельно без чтения промпта. Результат не оценивает точность на неизвестных корпоративных документах.",
+  "total": 24,
+  "correct": 23,
+  "results": [
+    {
+      "dataset": "semantic-example",
+      "source": "api",
+      "status": "completed",
+      "inputHashes": {
+        "before": "3676485db9489850cae194c1431283dcb673d0de5c66b544509dc18402b1b4e8",
+        "after": "a65b2d33390f74c93e7f1d4cda61128d337530d665cb76f5a7ba4abd65dc5b1b"
+      },
+      "total": 8,
+      "correct": 8,
+      "candidates": {
+        "correct": 3,
+        "total": 3
+      },
+      "changedMeaning": {
+        "correct": 3,
+        "total": 3
+      },
+      "noMatch": {
+        "correct": 2,
+        "total": 2
+      },
+      "falseEquivalent": 0,
+      "reviewed": 8,
+      "afterConsidered": 8,
+      "afterTotal": 8,
+      "limited": false,
+      "trace": [
+        {
+          "step": "Проверка сопоставлений моделью: принято 8 из 8",
+          "kind": "llm",
+          "model": "gpt-4.1-mini",
+          "source": "api",
+          "durationMs": 8069,
+          "inputSize": 8,
+          "citationsReturned": 8,
+          "citationsRejected": 0
+        },
+        {
+          "step": "Смысловой поиск соответствий: проверено 8 из 8",
+          "kind": "llm",
+          "model": "gpt-4.1",
+          "source": "api",
+          "durationMs": 3493,
+          "inputSize": 8,
+          "citationsReturned": 6,
+          "citationsRejected": 0
+        }
+      ],
+      "cases": [
+        {
+          "case": "Перечень соглашений вместо реестра договоров, новый владелец",
+          "beforeRef": "red8#s1.r2",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r4",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r4",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Контроль обязательств поставщиков, новый владелец",
+          "beforeRef": "red8#s1.r3",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r8",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r8",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Регистрация сообщений абонентов о сбоях",
+          "beforeRef": "red8#s1.r4",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r6",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r6",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Полномочие сменилось запретом",
+          "beforeRef": "red8#s1.r5",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r7",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r7",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Ежемесячная проверка стала ежеквартальной",
+          "beforeRef": "red8#s1.r6",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r2",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r2",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Обязанность сменяется правом",
+          "beforeRef": "red8#s1.r7",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r5",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r5",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Хранение оригиналов не подменяется выставкой фотографий",
+          "beforeRef": "red8#s1.r8",
+          "expectedStatus": "not_found",
+          "expectedAfter": null,
+          "actualStatus": "not_found",
+          "actualAfter": null,
+          "lexicalSimilarity": null,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Лицензирование радиочастот не подменяется закупкой ПО",
+          "beforeRef": "red8#s1.r9",
+          "expectedStatus": "not_found",
+          "expectedAfter": null,
+          "actualStatus": "not_found",
+          "actualAfter": null,
+          "lexicalSimilarity": null,
+          "localChange": "lost",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "dataset": "semantic-holdout",
+      "source": "api",
+      "status": "completed",
+      "inputHashes": {
+        "before": "f0022059c92c7c8037aa3038f2d0be8550d4b9706afda50baf9191df26e4f2df",
+        "after": "e4ef0e91aeb6840b86b80622ef79fe34fc3fb6bccc6001b67df895f3b1d7672b"
+      },
+      "total": 8,
+      "correct": 7,
+      "candidates": {
+        "correct": 2,
+        "total": 3
+      },
+      "changedMeaning": {
+        "correct": 3,
+        "total": 3
+      },
+      "noMatch": {
+        "correct": 2,
+        "total": 2
+      },
+      "falseEquivalent": 0,
+      "reviewed": 8,
+      "afterConsidered": 8,
+      "afterTotal": 8,
+      "limited": false,
+      "trace": [
+        {
+          "step": "Проверка сопоставлений моделью: принято 8 из 8",
+          "kind": "llm",
+          "model": "gpt-4.1-mini",
+          "source": "api",
+          "durationMs": 7295,
+          "inputSize": 8,
+          "citationsReturned": 8,
+          "citationsRejected": 0
+        },
+        {
+          "step": "Смысловой поиск соответствий: проверено 8 из 8",
+          "kind": "llm",
+          "model": "gpt-4.1",
+          "source": "api",
+          "durationMs": 2595,
+          "inputSize": 8,
+          "citationsReturned": 5,
+          "citationsRejected": 0
+        }
+      ],
+      "cases": [
+        {
+          "case": "Перечень угроз, другой владелец",
+          "beforeRef": "red8#s1.r2",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r3",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r3",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Доставка материалов, другой владелец",
+          "beforeRef": "red8#s1.r3",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r8",
+          "actualStatus": "not_found",
+          "actualAfter": null,
+          "lexicalSimilarity": null,
+          "localChange": "lost",
+          "correct": false
+        },
+        {
+          "case": "Проверка знаний после обучения",
+          "beforeRef": "red8#s1.r4",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r5",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r5",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Разрешение выплат сменяется запретом",
+          "beforeRef": "red8#s1.r5",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r7",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r7",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Ежедневное резервирование становится еженедельным",
+          "beforeRef": "red8#s1.r6",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r6",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r6",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Сплошной контроль стал выборочным",
+          "beforeRef": "red8#s1.r7",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r2",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r2",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Экскурсии не заменяют реставрацию",
+          "beforeRef": "red8#s1.r8",
+          "expectedStatus": "not_found",
+          "expectedAfter": null,
+          "actualStatus": "not_found",
+          "actualAfter": null,
+          "lexicalSimilarity": null,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Эвакуация не заменяет страхование",
+          "beforeRef": "red8#s1.r9",
+          "expectedStatus": "not_found",
+          "expectedAfter": null,
+          "actualStatus": "not_found",
+          "actualAfter": null,
+          "lexicalSimilarity": null,
+          "localChange": "lost",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "dataset": "semantic-blind",
+      "source": "api",
+      "status": "completed",
+      "inputHashes": {
+        "before": "86db736a28adb615f181917dc9a7eb53815bc083c7e45a88f3c8c7bf79aae35a",
+        "after": "d50b1d9b8474da27d29ded505bc899ad45463e6e23eb6716af599072df9f8ff8"
+      },
+      "total": 8,
+      "correct": 8,
+      "candidates": {
+        "correct": 3,
+        "total": 3
+      },
+      "changedMeaning": {
+        "correct": 3,
+        "total": 3
+      },
+      "noMatch": {
+        "correct": 2,
+        "total": 2
+      },
+      "falseEquivalent": 0,
+      "reviewed": 8,
+      "afterConsidered": 8,
+      "afterTotal": 8,
+      "limited": false,
+      "trace": [
+        {
+          "step": "Проверка сопоставлений моделью: принято 8 из 8",
+          "kind": "llm",
+          "model": "gpt-4.1-mini",
+          "source": "api",
+          "durationMs": 5308,
+          "inputSize": 8,
+          "citationsReturned": 8,
+          "citationsRejected": 0
+        },
+        {
+          "step": "Смысловой поиск соответствий: проверено 8 из 8",
+          "kind": "llm",
+          "model": "gpt-4.1",
+          "source": "api",
+          "durationMs": 2257,
+          "inputSize": 8,
+          "citationsReturned": 6,
+          "citationsRejected": 0
+        }
+      ],
+      "cases": [
+        {
+          "case": "Реестр выданных доверенностей: та же регистрационная обязанность у нового владельца",
+          "beforeRef": "red8#s1.r2",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r3",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r3",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Извещение авторов заявлений о решении: переформулировка и передача другому отделу",
+          "beforeRef": "red8#s1.r3",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r9",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r9",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Проверка правильности вычисления зарплаты: переформулировка без смены обязанности",
+          "beforeRef": "red8#s1.r4",
+          "expectedStatus": "candidate",
+          "expectedAfter": "red9#s1.r6",
+          "actualStatus": "candidate",
+          "actualAfter": "red9#s1.r6",
+          "lexicalSimilarity": 0,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Передача журналов доступа подрядчикам: запрет заменён разрешением",
+          "beforeRef": "red8#s1.r5",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r8",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r8",
+          "lexicalSimilarity": 0.4,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Отчёт об инцидентах службе безопасности: ежемесячная отправка заменена ежеквартальной",
+          "beforeRef": "red8#s1.r6",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r5",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r5",
+          "lexicalSimilarity": 0.462,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Проверка охраны труда: все филиалы заменены только филиалами северного региона",
+          "beforeRef": "red8#s1.r7",
+          "expectedStatus": "meaning_changed",
+          "expectedAfter": "red9#s1.r2",
+          "actualStatus": "meaning_changed",
+          "actualAfter": "red9#s1.r2",
+          "lexicalSimilarity": 0.375,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Уничтожение бумажных актов по сроку хранения отсутствует; проверка читаемости сканов не является заменой",
+          "beforeRef": "red8#s1.r8",
+          "expectedStatus": "not_found",
+          "expectedAfter": null,
+          "actualStatus": "not_found",
+          "actualAfter": null,
+          "lexicalSimilarity": null,
+          "localChange": "lost",
+          "correct": true
+        },
+        {
+          "case": "Согласование лимитов командировочных расходов отсутствует; сверка фактических затрат с проводками — другая обязанность",
+          "beforeRef": "red8#s1.r9",
+          "expectedStatus": "not_found",
+          "expectedAfter": null,
+          "actualStatus": "not_found",
+          "actualAfter": null,
+          "lexicalSimilarity": null,
+          "localChange": "lost",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

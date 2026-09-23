@@ -89,6 +89,11 @@ export function analyzeCountercheck(): Promise<AnalyzeResult> {
   return post('{}', { 'Content-Type': 'application/json' }, '/api/analyze/countercheck')
 }
 
+/** Синтетический пример поиска переформулировок без совпадения значимых слов. */
+export function analyzeSemantic(): Promise<AnalyzeResult> {
+  return post('{}', { 'Content-Type': 'application/json' }, '/api/analyze/semantic')
+}
+
 /** Две редакции: по одному или несколько файлов DOCX, PDF, XLSX. */
 export function analyzeFiles(before: File | File[], after: File | File[]): Promise<AnalyzeResult> {
   const form = new FormData()

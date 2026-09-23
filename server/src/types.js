@@ -115,6 +115,22 @@ const DocumentSetMeta = z.object({
   documents: z.array(z.object({ fileId: z.string(), name: z.string(), clauses: z.number() })).optional(),
 });
 
+/** Гипотезы второго прохода не изменяют исходную классификацию функций. */
+export const SemanticReview = z.object({
+  status: z.enum(['completed', 'unavailable', 'not_needed']),
+  source: z.enum(['api', 'fixture', 'none']), model: z.string(),
+  totalLost: z.number().int().nonnegative(), reviewed: z.number().int().nonnegative(),
+  afterConsidered: z.number().int().nonnegative(), afterTotal: z.number().int().nonnegative(),
+  limited: z.boolean(),
+  items: z.array(z.object({
+    beforeRef: ClauseRef, ownerBefore: z.string(),
+    status: z.enum(['candidate', 'meaning_changed', 'not_found', 'unreviewed']),
+    ownerAfter: z.string().nullable(), evidenceBefore: Evidence, evidenceAfter: Evidence.nullable(),
+    beforeFragment: z.string().nullable(), afterFragment: z.string().nullable(),
+    similarity: z.number().min(0).max(1).nullable(), materialChanges: z.array(MaterialChange),
+  })),
+});
+
 /** Полный отчёт — то, что отдаёт POST /api/analyze и рисует фронтенд. */
 export const AnalysisReport = z.object({
   meta: z.object({
@@ -130,6 +146,7 @@ export const AnalysisReport = z.object({
   conflicts: z.array(ConflictOfInterest),
   gaps: z.array(NormativeGap),
   quality: AnalysisQuality.optional(),
+  semanticReview: SemanticReview.optional(),
   /** Итоговое аналитическое заключение (must have 5). */
   conclusion: z.object({
     summary: z.string(),

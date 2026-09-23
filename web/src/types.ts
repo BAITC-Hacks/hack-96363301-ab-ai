@@ -106,6 +106,32 @@ export interface AnalysisQuality {
   uniqueSources: number
 }
 
+export interface SemanticReviewItem {
+  beforeRef: ClauseRef
+  ownerBefore: string
+  status: 'candidate' | 'meaning_changed' | 'not_found' | 'unreviewed'
+  ownerAfter: string | null
+  evidenceBefore: Evidence
+  evidenceAfter: Evidence | null
+  beforeFragment: string | null
+  afterFragment: string | null
+  similarity: number | null
+  materialChanges: MaterialChange[]
+}
+
+/** Предложения модельного поиска не изменяют основное сопоставление функций. */
+export interface SemanticReviewResult {
+  status: 'completed' | 'unavailable' | 'not_needed'
+  source: 'api' | 'fixture' | 'none'
+  model: string
+  totalLost: number
+  reviewed: number
+  afterConsidered: number
+  afterTotal: number
+  limited: boolean
+  items: SemanticReviewItem[]
+}
+
 /** Полный отчёт — то, что отдаёт POST /api/analyze и рисует фронтенд. */
 export interface AnalysisReport {
   meta: {
@@ -121,6 +147,7 @@ export interface AnalysisReport {
   conflicts: ConflictOfInterest[]
   gaps: NormativeGap[]
   quality?: AnalysisQuality
+  semanticReview?: SemanticReviewResult
   /** Итоговое аналитическое заключение (must have 5). */
   conclusion: {
     summary: string

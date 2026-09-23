@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { app } from '../src/index.js';
+import { listenTestServer } from '../test-support/http-server.js';
 
 process.env.OPENAI_API_KEY = '';
 
@@ -22,8 +23,7 @@ const after = [
 ];
 
 async function serverFor(t) {
-  const server = app.listen(0, '127.0.0.1');
-  await new Promise((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
+  const server = await listenTestServer(app);
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   return `http://127.0.0.1:${server.address().port}`;
 }

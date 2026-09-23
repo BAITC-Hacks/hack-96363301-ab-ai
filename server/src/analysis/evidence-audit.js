@@ -88,6 +88,58 @@ export function auditReportEvidence(report, clauseIndex) {
     }
   });
 
+  // Semantic pairs remain hypotheses. Their sources and owners must come from
+  // the already audited local comparison, including rows the model did not review.
+  if (report.semanticReview !== undefined) {
+    const lostByRef = new Map();
+    const afterByRef = new Map();
+    const indexOwners = (index, refs, owner) => refs.forEach((ref) => {
+      if (!index.has(ref.ref)) index.set(ref.ref, new Set());
+      index.get(ref.ref).add(owner);
+    });
+    for (const item of report.functions) {
+      if (item.change === 'lost') indexOwners(lostByRef, item.evidenceBefore, item.ownerBefore);
+      indexOwners(afterByRef, item.evidenceAfter, item.ownerAfter);
+    }
+    const seen = new Set();
+    array(report.semanticReview?.items, 'semanticReview.items').forEach((item, i) => {
+      const path = `semanticReview.items[${i}]`;
+      if (!['candidate', 'meaning_changed', 'not_found', 'unreviewed'].includes(item?.status)) fail(path, 'неизвестный результат смысловой проверки');
+      evidence(item.evidenceBefore, `${path}.evidenceBefore`);
+      edition([item.evidenceBefore], report.meta?.before?.docId, `${path}.evidenceBefore`);
+      if (item.beforeRef !== item.evidenceBefore.ref || !lostByRef.has(item.beforeRef)) {
+        fail(`${path}.beforeRef`, 'источник не относится к функции без найденного соответствия');
+      }
+      if (seen.has(item.beforeRef)) fail(`${path}.beforeRef`, 'повторный результат для одного источника');
+      seen.add(item.beforeRef);
+      if (!lostByRef.get(item.beforeRef).has(item.ownerBefore)) fail(`${path}.ownerBefore`, 'владелец не совпадает с локальным сопоставлением');
+      const materialChanges = array(item.materialChanges, `${path}.materialChanges`);
+      const paired = ['candidate', 'meaning_changed'].includes(item.status);
+      if (!paired) {
+        for (const field of ['evidenceAfter', 'ownerAfter', 'beforeFragment', 'afterFragment', 'similarity']) {
+          if (item[field] !== null) fail(`${path}.${field}`, 'для результата без пары ожидалось пустое значение');
+        }
+        if (materialChanges.length) fail(`${path}.materialChanges`, 'без пары нельзя подтверждать изменение формулировки');
+        return;
+      }
+      evidence(item.evidenceAfter, `${path}.evidenceAfter`);
+      edition([item.evidenceAfter], report.meta?.after?.docId, `${path}.evidenceAfter`);
+      if (!afterByRef.has(item.evidenceAfter.ref)) fail(`${path}.evidenceAfter`, 'источник не относится к распознанной функции новой редакции');
+      if (!afterByRef.get(item.evidenceAfter.ref).has(item.ownerAfter)) fail(`${path}.ownerAfter`, 'владелец не совпадает с локальным сопоставлением');
+      if (!Number.isFinite(item.similarity) || item.similarity < 0 || item.similarity > 1) fail(`${path}.similarity`, 'сходство текста должно быть числом от 0 до 1');
+      const fragment = (value, ref, fragmentPath) => {
+        if (typeof value !== 'string' || !value.trim()) fail(fragmentPath, 'выделенный фрагмент пуст');
+        if (!ref.text.includes(value)) fail(fragmentPath, 'выделенный фрагмент не найден в процитированном источнике этой редакции');
+      };
+      fragment(item.beforeFragment, item.evidenceBefore, `${path}.beforeFragment`);
+      fragment(item.afterFragment, item.evidenceAfter, `${path}.afterFragment`);
+      materialChanges.forEach((signal, j) => {
+        fragment(signal?.beforeFragment, item.evidenceBefore, `${path}.materialChanges[${j}].beforeFragment`);
+        fragment(signal?.afterFragment, item.evidenceAfter, `${path}.materialChanges[${j}].afterFragment`);
+      });
+    });
+  }
+
   for (const [texts, refs] of [['findings', 'findingEvidence'], ['recommendations', 'recommendationEvidence']]) {
     const values = array(report.conclusion?.[texts], `conclusion.${texts}`);
     const groups = array(report.conclusion?.[refs], `conclusion.${refs}`);

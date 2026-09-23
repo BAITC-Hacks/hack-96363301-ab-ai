@@ -9,6 +9,7 @@ import { findConflicts } from '../src/analysis/diff.js';
 import { applyModelExplanations } from '../src/llm/enrich.js';
 import { analyze } from '../src/pipeline.js';
 import { app } from '../src/index.js';
+import { listenTestServer } from '../test-support/http-server.js';
 
 process.env.OPENAI_API_KEY = ''; // Все проверки автономны, без сетевых вызовов модели.
 const sample = `8. Структура
@@ -111,8 +112,7 @@ test('Текстовый PDF с кириллицей проходит полны
 });
 
 test('API: демо, загрузка кириллицы, неподдерживаемые и повреждённые файлы', async (t) => {
-  const server = app.listen(0, '127.0.0.1');
-  await new Promise((resolve) => server.once('listening', resolve));
+  const server = await listenTestServer(app);
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
   const demo = await fetch(`${base}/api/analyze/demo`, { method: 'POST' });

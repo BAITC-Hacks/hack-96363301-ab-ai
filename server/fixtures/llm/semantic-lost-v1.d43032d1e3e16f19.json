@@ -1,0 +1,60 @@
+{
+  "items": [
+    {
+      "id": "s0",
+      "afterRef": "red9#s1.r3",
+      "relation": "changed",
+      "beforeFragment": "Формирует перечень угроз информационной безопасности",
+      "afterFragment": "Составляет список потенциальных опасностей для защиты корпоративной информации"
+    },
+    {
+      "id": "s1",
+      "afterRef": "null",
+      "relation": "none",
+      "beforeFragment": "Организует доставку материалов со склада на производственные площадки",
+      "afterFragment": null
+    },
+    {
+      "id": "s2",
+      "afterRef": "red9#s1.r5",
+      "relation": "equivalent",
+      "beforeFragment": "Оценивает знания сотрудников после завершения учебных курсов",
+      "afterFragment": "Тестирует уровень усвоения материала работниками по окончании образовательных программ"
+    },
+    {
+      "id": "s3",
+      "afterRef": "red9#s1.r7",
+      "relation": "changed",
+      "beforeFragment": "Имеет право разрешать перечисление денежных средств контрагентам",
+      "afterFragment": "Подразделению запрещается санкционировать выплаты партнёрам"
+    },
+    {
+      "id": "s4",
+      "afterRef": "null",
+      "relation": "none",
+      "beforeFragment": "Ежедневно создаёт резервную копию базы данных клиентов",
+      "afterFragment": null
+    },
+    {
+      "id": "s5",
+      "afterRef": "red9#s1.r2",
+      "relation": "changed",
+      "beforeFragment": "Проверяет каждую поступившую партию продукции",
+      "afterFragment": "Выборочно контролирует отдельные поставки готовых изделий"
+    },
+    {
+      "id": "s6",
+      "afterRef": "red9#s1.r9",
+      "relation": "changed",
+      "beforeFragment": "Реставрирует повреждённые исторические экспонаты корпоративного музея",
+      "afterFragment": "Проводит экскурсии для посетителей экспозиции"
+    },
+    {
+      "id": "s7",
+      "afterRef": "null",
+      "relation": "none",
+      "beforeFragment": "Страхует здания предприятия от пожара и стихийных бедствий",
+      "afterFragment": null
+    }
+  ]
+}

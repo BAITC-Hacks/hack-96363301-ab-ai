@@ -31,7 +31,7 @@ export function Section({
         {subtitle ? <span className="text-xs text-slate-600">{subtitle}</span> : null}
         <div className="ml-auto">{right}</div>
       </header>
-      <div className="px-4 py-3">{children}</div>
+      <div className="min-w-0 overflow-x-auto px-4 py-3">{children}</div>
     </section>
   )
 }

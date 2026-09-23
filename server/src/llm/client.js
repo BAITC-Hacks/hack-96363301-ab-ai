@@ -29,8 +29,8 @@ export function hasApiKey() {
 }
 
 /** Ключ фикстуры — хеш от модели и полезной нагрузки запроса. */
-export function fixtureKey(name, payload) {
-  const hash = createHash('sha256').update(JSON.stringify({ name, MODEL, payload })).digest('hex').slice(0, 16);
+export function fixtureKey(name, payload, model = MODEL) {
+  const hash = createHash('sha256').update(JSON.stringify({ name, MODEL: model, payload })).digest('hex').slice(0, 16);
   return `${name}.${hash}`;
 }
 
@@ -45,7 +45,10 @@ async function readFixture(key, validator) {
 
 async function writeFixture(key, data) {
   await mkdir(FIXTURES_DIR, { recursive: true });
-  await writeFile(join(FIXTURES_DIR, `${key}.json`), `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  // Фиксируем первый ответ: повторное демо не переписывает доказательство прогона.
+  try {
+    await writeFile(join(FIXTURES_DIR, `${key}.json`), `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+  } catch (error) { if (error.code !== 'EEXIST') throw error; }
 }
 
 let client = null;
@@ -65,8 +68,8 @@ function getClient() {
  * @param {import('zod').ZodTypeAny} opts.validator  zod-схема для проверки
  * @returns {Promise<{data: object|null, source: 'api'|'fixture'|'none', durationMs: number, error: string|null}>}
  */
-export async function callModel({ name, system, user, schema, validator }) {
-  const key = fixtureKey(name, { system, user });
+export async function callModel({ name, system, user, schema, validator, maxCompletionTokens = 8192, model = MODEL }) {
+  const key = fixtureKey(name, { system, user }, model);
   const started = Date.now();
 
   if (!hasApiKey()) {
@@ -81,7 +84,9 @@ export async function callModel({ name, system, user, schema, validator }) {
 
   try {
     const response = await getClient().chat.completions.create({
-      model: MODEL,
+      model,
+      max_completion_tokens: maxCompletionTokens,
+      store: false,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },

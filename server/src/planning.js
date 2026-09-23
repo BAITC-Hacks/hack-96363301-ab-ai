@@ -130,6 +130,7 @@ export async function exportPlan(report, plan) {
     ...report.functions.flatMap((f) => [...f.evidenceBefore, ...f.evidenceAfter]),
     ...(report.quality?.warnings || []).flatMap((w) => w.evidence),
     ...report.units.flatMap((unit) => unit.evidence),
+    ...(report.semanticReview?.items || []).flatMap((item) => [item.evidenceBefore, item.evidenceAfter].filter(Boolean)),
   ])) {
     const file = e.fileId ? documents.find((item) => item.docId === e.docId && item.fileId === e.fileId) : null;
     const fileName = e.fileName || file?.name || (e.docId === 'red8' ? report.meta.before.name : report.meta.after.name);
@@ -154,6 +155,33 @@ export async function exportPlan(report, plan) {
   const functions = workbook.addWorksheet('Сопоставление функций');
   functions.columns = [{ header: 'Изменение', width: 25 }, { header: 'Функция', width: 110 }, { header: 'Владелец до', width: 35 }, { header: 'Владелец после', width: 35 }, { header: 'Источники', width: 60 }];
   for (const f of report.functions) functions.addRow([f.change, f.text.slice(0, 32767), f.ownerBefore || '', f.ownerAfter || '', [...f.evidenceBefore, ...f.evidenceAfter].map((e) => e.ref).join(', ')]);
+  if (report.semanticReview?.totalLost > 0) {
+    const review = report.semanticReview;
+    const semantic = workbook.addWorksheet('Смысловая проверка');
+    semantic.columns = [
+      { header: 'Результат проверки', width: 48 }, { header: 'Владелец до', width: 35 }, { header: 'Владелец после', width: 35 },
+      { header: 'Фрагмент до', width: 90 }, { header: 'Фрагмент после', width: 90 },
+      { header: 'Источник до', width: 32 }, { header: 'Источник после', width: 32 },
+      { header: 'Сходство текста (не уверенность)', width: 30 }, { header: 'Изменения формулировки', width: 85 },
+      { header: 'Источник проверки', width: 24 }, { header: 'Модель', width: 30 }, { header: 'Ограничение и охват', width: 110 },
+    ];
+    const labels = {
+      candidate: 'Кандидат — требуется проверка', meaning_changed: 'Возможно изменение смысла',
+      not_found: 'Пара не найдена в просмотренных пунктах', unreviewed: 'Не проверено',
+    };
+    const scope = `Проверено функций до: ${review.reviewed} из ${review.totalLost}. Рассмотрено пунктов после: ${review.afterConsidered} из ${review.afterTotal}. ${review.limited ? 'Область поиска ограничена. ' : ''}Гипотезы требуют проверки человеком; классификация функций и план решений не изменены. Отсутствие пары не доказывает утрату функции.`;
+    const link = (e) => e ? { text: e.ref, hyperlink: `#'Источники'!A${sourceRows.get(e.ref)}` } : '';
+    for (const item of review.items) {
+      semantic.addRow([
+        labels[item.status], item.ownerBefore || '', item.ownerAfter || '',
+        item.beforeFragment || '', item.afterFragment || '', link(item.evidenceBefore), link(item.evidenceAfter),
+        item.similarity == null ? '' : `${Math.round(item.similarity * 100)}%`,
+        item.materialChanges.map((signal) => `${signal.title}: «${signal.beforeFragment}» → «${signal.afterFragment}». ${signal.detail}`).join('\n').slice(0, 32767),
+        item.status === 'unreviewed' ? 'none' : review.source, review.model, scope,
+      ]);
+    }
+    if (!review.items.length) semantic.addRow(['Не проверено', '', '', '', '', '', '', '', '', 'none', review.model, scope]);
+  }
   const material = report.functions.filter((f) => f.materialChanges?.length);
   if (material.length) {
     const checks = workbook.addWorksheet('Контрпроверка');
