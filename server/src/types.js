@@ -50,6 +50,7 @@ export const FunctionDiff = z.object({
   similarity: z.number().min(0).max(1),
   evidenceBefore: z.array(Evidence),
   evidenceAfter: z.array(Evidence),
+  reviewCandidates: z.array(z.object({ evidence: Evidence, similarity: z.number().min(0).max(1), owner: z.string() })).default([]),
   /** Объяснение от модели; при пустом ключе берётся из фикстур. */
   rationale: z.string().nullable(),
 });
@@ -93,6 +94,7 @@ export const TraceStep = z.object({
 /** Полный отчёт — то, что отдаёт POST /api/analyze и рисует фронтенд. */
 export const AnalysisReport = z.object({
   meta: z.object({
+    reportId: z.string().uuid().optional(),
     before: z.object({ docId: z.string(), name: z.string(), clauses: z.number() }),
     after: z.object({ docId: z.string(), name: z.string(), clauses: z.number() }),
     mode: z.enum(['live', 'demo']),

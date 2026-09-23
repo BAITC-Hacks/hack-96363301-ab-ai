@@ -96,14 +96,17 @@ export function diffFunctions(functionsBefore, functionsAfter, clauseIndex) {
   for (const b of before) {
     let best = null;
     let bestScore = 0;
+    let bestOwnerOverlap = -1;
     for (const a of after) {
       // Функции блока в целом (раздел 2.4) и функции подразделений
       // (раздел 5) живут в разных плоскостях — не смешиваем.
       if (a.scope !== b.scope) continue;
       const score = similarity(b.tokens, a.tokens);
-      if (score > bestScore) {
+      const ownerOverlap = b.owners.filter((o) => a.owners.includes(o)).length;
+      if (score > bestScore || (score === bestScore && ownerOverlap > bestOwnerOverlap)) {
         bestScore = score;
         best = a;
+        bestOwnerOverlap = ownerOverlap;
       }
     }
 
@@ -116,16 +119,20 @@ export function diffFunctions(functionsBefore, functionsAfter, clauseIndex) {
         similarity: Number(bestScore.toFixed(3)),
         evidenceBefore: evidence(b, clauseIndex),
         evidenceAfter: [],
+        reviewCandidates: after.filter((a) => a.scope === b.scope)
+          .map((a) => ({ evidence: evidence(a, clauseIndex)[0], similarity: Number(similarity(b.tokens, a.tokens).toFixed(3)), owner: a.owners.join(', ') }))
+          .filter((a) => a.similarity >= 0.3)
+          .sort((a, b) => b.similarity - a.similarity).slice(0, 3),
         rationale: null,
       });
       continue;
     }
 
     usedAfter.add(best.ref);
-    const sharedOwner = b.owners.some((o) => best.owners.includes(o));
+    const sameOwners = b.owners.length === best.owners.length && b.owners.every((o) => best.owners.includes(o));
 
     let change;
-    if (!sharedOwner) change = 'moved';
+    if (!sameOwners) change = 'moved';
     else if (bestScore >= IDENTICAL_THRESHOLD) change = 'kept';
     else change = 'reworded';
 
@@ -144,7 +151,6 @@ export function diffFunctions(functionsBefore, functionsAfter, clauseIndex) {
   for (const a of after) {
     if (usedAfter.has(a.ref)) continue;
     const bestScore = Math.max(0, ...before.filter((b) => b.scope === a.scope).map((b) => similarity(b.tokens, a.tokens)));
-    if (bestScore >= MATCH_THRESHOLD) continue;
     results.push({
       change: 'added',
       text: a.text,
@@ -193,7 +199,9 @@ export function findDuplicates(functions, clauseIndex) {
       text: entries[i].text,
       owners,
       evidence: group.flatMap((g) => evidence(g, clauseIndex)),
-      rationale: null,
+      rationale: /участв|содейств|в зоне|зоне ответственности/iu.test(entries[i].text)
+        ? 'Формулировка описывает участие или работу в своей зоне ответственности. Это может быть совместная обязанность; избыточное дублирование не установлено. Уточните роли и границы процессов.'
+        : 'Похожие обязанности закреплены в разных пунктах у нескольких подразделений. Проверьте, совпадают ли объекты работы и границы ответственности, прежде чем считать это избыточным дублированием.',
     });
   }
 

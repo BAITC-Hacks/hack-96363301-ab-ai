@@ -117,6 +117,10 @@ export function extractFunctions(doc, units) {
 
   for (const clause of doc.clauses) {
     if (!clause.number) continue;
+    // Короткая вводная к перечислению не является отдельной функцией.
+    // Составные пункты с самостоятельным действием перед запятой сохраняем.
+    if (/^[^,;]+в части:\s*$/iu.test(clause.text) &&
+        doc.clauses.some((c) => c.parent === clause.id)) continue;
 
     // Слишком короткие фрагменты — не функции, а артефакты разметки
     // (в редакции 8 встречается пустой пункт «5.5.3. ;»).
