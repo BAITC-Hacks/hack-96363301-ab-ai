@@ -39,6 +39,7 @@ export async function parseDocument(buffer, docId, name) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     const clauses = [];
+    const diagnostics = [];
     workbook.eachSheet((sheet, sheetId) => {
       let columns = null;
       let previousOwner = '';
@@ -47,20 +48,26 @@ export async function parseDocument(buffer, docId, name) {
         row.eachCell({ includeEmpty: true }, (cell, col) => { cells[col] = cell.text.trim(); });
         const unitColumn = cells.findIndex((s) => /^(подразделение|департамент|отдел)$/iu.test(s || ''));
         const functionColumn = cells.findIndex((s) => /^(функция|функции|обязанности|задача)$/iu.test(s || ''));
-        if (unitColumn > 0 && functionColumn > 0) { columns = { unitColumn, functionColumn }; return; }
+        if (unitColumn > 0 && functionColumn > 0) { columns = { unitColumn, functionColumn }; previousOwner = ''; return; }
         if (!columns) return;
         const owner = cells[columns.unitColumn] || previousOwner;
         previousOwner = owner;
-        if (!owner) return;
         const number = `${sheet.name}, строка ${rowNumber}`;
         const id = `${docId}#s${sheetId}.r${rowNumber}`;
-        clauses.push({ id: `${id}.u`, docId, number, text: owner, unitDefinition: owner });
         const text = cells[columns.functionColumn];
+        if (!owner) {
+          if (text) {
+            clauses.push({ id, docId, number, text, unassignedFunction: true });
+            diagnostics.push({ code: 'missing_function_owner', ref: id, detail: `В строке «${number}» указана функция, но не определено подразделение. Строка сохранена как источник и не включена в сопоставление функций.` });
+          }
+          return;
+        }
+        clauses.push({ id: `${id}.u`, docId, number, text: owner, unitDefinition: owner });
         if (text) clauses.push({ id, docId, number, text, functionOwner: owner });
       });
     });
-    if (!clauses.some((c) => c.functionOwner)) throw new Error('В XLSX нужны столбцы «Подразделение» и «Функция» (или «Функции», «Обязанности», «Задача»).');
-    return { docId, clauses, sections: [] };
+    if (!clauses.some((c) => c.functionOwner || c.unassignedFunction)) throw new Error('В XLSX нужны столбцы «Подразделение» и «Функция» (или «Функции», «Обязанности», «Задача»).');
+    return { docId, clauses, sections: [], diagnostics };
   }
   throw new Error('Поддерживаются DOCX, PDF с текстовым слоем и XLSX. Сохраните старый Word/Excel в новом формате.');
 }

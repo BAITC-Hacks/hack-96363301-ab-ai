@@ -98,6 +98,15 @@ export const TraceStep = z.object({
   citationsRejected: z.number().nullable(),
 });
 
+export const AnalysisQuality = z.object({
+  documents: z.array(z.object({
+    docId: z.string(), name: z.string(), clauses: z.number().int().nonnegative(), units: z.number().int().nonnegative(),
+    functionClauses: z.number().int().nonnegative(), ownerBindings: z.number().int().nonnegative(), unassignedClauses: z.number().int().nonnegative(),
+  })),
+  warnings: z.array(z.object({ code: z.string(), title: z.string(), detail: z.string(), evidence: z.array(Evidence).min(1) })),
+  checkedReferences: z.number().int().nonnegative(), uniqueSources: z.number().int().nonnegative(),
+});
+
 /** Полный отчёт — то, что отдаёт POST /api/analyze и рисует фронтенд. */
 export const AnalysisReport = z.object({
   meta: z.object({
@@ -112,6 +121,7 @@ export const AnalysisReport = z.object({
   duplicates: z.array(Duplicate),
   conflicts: z.array(ConflictOfInterest),
   gaps: z.array(NormativeGap),
+  quality: AnalysisQuality.optional(),
   /** Итоговое аналитическое заключение (must have 5). */
   conclusion: z.object({
     summary: z.string(),

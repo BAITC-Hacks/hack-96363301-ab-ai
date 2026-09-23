@@ -2,6 +2,7 @@
 // Использует встроенные fetch/WebSocket Node, без библиотек автоматизации.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
+import ExcelJS from 'exceljs';
 const target = await (await fetch('http://127.0.0.1:9333/json/new?about:blank', { method: 'PUT' })).json();
 const socket = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
@@ -46,6 +47,7 @@ try {
   await evaluate(`Object.keys(localStorage).filter(k => k.startsWith('orgdiff.plan.')).forEach(k => localStorage.removeItem(k))`);
   await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Проверить учебный пример')).click()`);
   await until(`!!document.querySelector('[aria-label="Краткие итоги"]')`);
+  assert.ok(await evaluate(`!!document.querySelector('[aria-label="Полнота анализа"]')`));
   assert.equal(await evaluate(`document.querySelectorAll('#functions tbody tr').length`), 4);
   assert.equal(await evaluate(`document.querySelector('#trace').open`), false);
   assert.ok(await evaluate(`document.querySelector('#trace').textContent.includes('ответов модели: 0 (API: 0)')`));
@@ -128,8 +130,33 @@ try {
   await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Выгрузить план в Excel')).click()`);
   await until(`document.querySelector('#reorganization-lab').textContent.includes('Excel сформирован:')`);
   assert.equal(exportStatus, 200);
+  // Реальная загрузка пары XLSX через файловые поля, включая нераспознанного владельца.
+  const workbook = new ExcelJS.Workbook();
+  workbook.addWorksheet('Функции').addRows([['Подразделение', 'Функция'], ['', 'Хранит архив протоколов комиссии.'], ['Отдел контроля (ОК)', 'Согласует договоры.']]);
+  const uploadBase64 = Buffer.from(await workbook.xlsx.writeBuffer()).toString('base64');
+  await evaluate(`(() => {
+    const inputs = [...document.querySelectorAll('input[type="file"]')];
+    inputs[0].closest('details').open = true;
+    const bytes = Uint8Array.from(atob('${uploadBase64}'), c => c.charCodeAt(0));
+    inputs.forEach((input, i) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([bytes], i ? 'Проверка полноты после.xlsx' : 'Проверка полноты до.xlsx', {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      input.files = transfer.files; input.dispatchEvent(new Event('change', {bubbles:true}));
+    });
+  })()`);
+  await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Проанализировать загруженные документы').click()`);
+  await until(`document.querySelector('[aria-label="Полнота анализа"]')?.textContent.includes('Хранит архив протоколов комиссии.')`);
+  assert.equal(await evaluate(`document.querySelector('[aria-label="Полнота анализа"]').open`), true);
+  assert.ok(await evaluate(`document.querySelector('#conclusion').textContent.includes('часть пунктов не включена')`));
+  assert.ok(await evaluate(`document.querySelector('[aria-label="Полнота анализа"]').textContent.includes('Проверено ссылок в отчёте')`));
+  if (process.argv.includes('--screenshots')) {
+    await evaluate(`document.documentElement.style.scrollBehavior = 'auto'; document.querySelector('[aria-label="Полнота анализа"]').scrollIntoView({behavior:'instant'})`);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const screenshot = await send('Page.captureScreenshot', { format: 'png' });
+    await writeFile(new URL('../../docs/screenshots/11-analysis-coverage.png', import.meta.url), Buffer.from(screenshot.data, 'base64'));
+  }
   assert.deepEqual(errors, []);
-  console.log('PASS: карта, решения, восстановление плана, демо, контрпроверка 4 изменений, подсветка цитат, фильтры, обязательные источники обеих редакций, эскалация и экспорт; ошибок JavaScript нет.');
+  console.log('PASS: карта, решения, восстановление, демо, контрпроверка, источники и экспорт; реальная загрузка XLSX, паспорт неполного анализа и предупреждение заключения. Ошибок JavaScript нет.');
 } finally {
   await fetch(`http://127.0.0.1:9333/json/close/${target.id}`);
   socket.close();

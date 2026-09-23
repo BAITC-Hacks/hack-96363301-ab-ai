@@ -93,6 +93,13 @@ function runCheck(check, report, clauseIndex) {
       return n <= check.max ? { ok: true, detail: `${n} <= ${check.max}` } : { ok: false, detail: `${n} > ${check.max}` };
     }
 
+    case 'lost-sources': {
+      const actual = report.functions.filter((f) => f.change === 'lost').flatMap((f) => f.evidenceBefore.map((e) => e.ref)).sort();
+      const expected = [...check.refs].sort();
+      const ok = JSON.stringify(actual) === JSON.stringify(expected);
+      return { ok, detail: ok ? `Точные адреса ${actual.length} кандидатов совпали с ручной проверкой` : `Не совпали адреса кандидатов: ${actual.join(', ')}` };
+    }
+
     case 'not-lost': {
       const bad = report.functions.find((f) => f.change === 'lost' && refsOf(f).includes(check.ref));
       return bad ? { ok: false, detail: `${check.ref} ошибочно помечен как потерянный` } : { ok: true, detail: `${check.ref} не в потерях` };

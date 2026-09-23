@@ -67,17 +67,39 @@ export function parsePlainText(raw, docId) {
   const clauses = [];
   const sections = [];
   const seenSections = new Set();
+  const seenNumbers = new Set();
+  const letterOccurrences = new Map();
 
   let currentSection = null;
   let lastNumbered = null;
+  let lastClause = null;
+  let inTableOfContents = false;
 
   for (const line of lines) {
+    if (/^(оглавление|содержание)$/iu.test(line)) {
+      inTableOfContents = true;
+      continue;
+    }
     const clauseMatch = line.match(CLAUSE_RE);
+    if (inTableOfContents) {
+      if (isTocEntry(clauseMatch ? line.slice(clauseMatch[0].length).trim() : line)) continue;
+      inTableOfContents = false;
+    }
 
     if (clauseMatch) {
       const number = clauseMatch[1];
       const text = line.slice(clauseMatch[0].length).trim();
       const depth = number.split('.').length;
+
+      // Only an exact repetition of a known section title followed by a page
+      // number is a clear TOC entry. An uppercase duty ending in a number is not.
+      const knownSection = sections.find((section) => section.number === number);
+      if (depth === 1 && knownSection && isTocEntry(text)
+        && normalize(text.replace(/\s\d{1,3}$/, '')).toUpperCase() === normalize(knownSection.title).toUpperCase()) continue;
+      if (seenNumbers.has(number)) {
+        throw new Error(`В документе ${docId} повторяется номер пункта ${number}. Уточните нумерацию разделов или приложений: одинаковые номера нельзя безопасно использовать как источники.`);
+      }
+      seenNumbers.add(number);
 
       // Верхний уровень («3. Структура и организация работы») — заголовок раздела.
       // В конце документа идёт оглавление, где те же номера повторяются с
@@ -99,14 +121,20 @@ export function parsePlainText(raw, docId) {
       };
       clauses.push(clause);
       lastNumbered = clause;
+      lastClause = clause;
       continue;
     }
 
     const letterMatch = line.match(LETTER_RE);
     if (letterMatch && lastNumbered) {
       const letter = letterMatch[1].toLowerCase();
-      clauses.push({
-        id: `${lastNumbered.id}${letter}`,
+      const originalId = `${lastNumbered.id}${letter}`;
+      const occurrence = (letterOccurrences.get(originalId) || 0) + 1;
+      letterOccurrences.set(originalId, occurrence);
+      // One numbered paragraph may contain several separate lettered lists.
+      // Keep each source occurrence instead of overwriting the previous list.
+      const clause = {
+        id: occurrence === 1 ? originalId : `${lastNumbered.id}.r${occurrence}${letter}`,
         docId,
         number: `${lastNumbered.number}${letter}`,
         depth: lastNumbered.depth + 1,
@@ -114,13 +142,15 @@ export function parsePlainText(raw, docId) {
         sectionTitle: lastNumbered.sectionTitle,
         text: line.slice(letterMatch[0].length).trim(),
         parent: lastNumbered.id,
-      });
+      };
+      clauses.push(clause);
+      lastClause = clause;
       continue;
     }
 
     // Абзац без номера: приложение к предыдущему пункту, а не отдельная единица.
-    if (lastNumbered) {
-      lastNumbered.text = `${lastNumbered.text} ${line}`.trim();
+    if (lastClause) {
+      lastClause.text = `${lastClause.text} ${line}`.trim();
     } else {
       // Преамбула до первого номера — титульный лист, гриф утверждения.
       clauses.push({
@@ -144,7 +174,10 @@ export function parsePlainText(raw, docId) {
 export function indexClauses(...parsedDocs) {
   const index = new Map();
   for (const doc of parsedDocs) {
-    for (const clause of doc.clauses) index.set(clause.id, clause);
+    for (const clause of doc.clauses) {
+      if (index.has(clause.id)) throw new Error(`Повторная ссылка на источник ${clause.id}: индекс документов должен содержать уникальные пункты.`);
+      index.set(clause.id, clause);
+    }
   }
   return index;
 }

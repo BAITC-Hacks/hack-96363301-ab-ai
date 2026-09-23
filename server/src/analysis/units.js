@@ -16,7 +16,7 @@
  */
 
 const UNIT_NAME_RE = /^(департамент|управление|отдел|служба|бюро)\s/iu;
-const OWNER_HEADER_RE = /^(директор|начальник|руководитель|функции\s+(департамента|отдела|управления))/iu;
+const OWNER_HEADER_RE = /^(директор|начальник|руководитель|функции\s+(департамента|отдела|управления|службы|бюро))/iu;
 const ORG_FUNCTIONS_RE = /осуществляет следующие функции|функции (организации|общества|блока)|^функции:?$/iu;
 const childOf = (number, parent) => number !== parent && (number.startsWith(`${parent}.`) || new RegExp(`^${parent.replace(/\./g, '\\.')}[а-яё]$`, 'u').test(number));
 /** «Директоры департаментов обязаны…» — заголовок, общий для всех департаментов. */
@@ -40,7 +40,7 @@ export function normalizeText(s) {
 
 /** Значимые слова названия — по ним владелец узнаётся в заголовке пункта. */
 function nameKeywords(name) {
-  const stop = new Set(['департамент', 'департамента', 'управление', 'отдел', 'системы', 'и', 'по']);
+  const stop = new Set(['департамент', 'департамента', 'управление', 'управления', 'отдел', 'отдела', 'служба', 'службы', 'бюро', 'системы', 'и', 'по']);
   return normalizeText(name)
     .split(' ')
     .filter((w) => w.length > 3 && !stop.has(w));
@@ -90,7 +90,7 @@ export function extractOwners(doc, units) {
       number: header.number,
       ref: header.id,
       title: header.text.replace(/:$/, '').trim(),
-      units: generic ? units.map((u) => u.abbr || u.name) : matched.map((u) => u.abbr || u.name),
+      units: generic ? units.filter((u) => /^департамент\s/iu.test(u.name)).map((u) => u.abbr || u.name) : matched.map((u) => u.abbr || u.name),
       generic,
     });
   }
@@ -117,14 +117,16 @@ export function extractFunctions(doc, units) {
 
   for (const clause of doc.clauses) {
     if (!clause.number) continue;
+    if (clause.unassignedFunction) continue;
+    if (!clause.functionOwner && owners.has(clause.number)) continue;
     // Короткая вводная к перечислению не является отдельной функцией.
     // Составные пункты с самостоятельным действием перед запятой сохраняем.
-    if (/^[^,;]+в части:\s*$/iu.test(clause.text) &&
-        doc.clauses.some((c) => c.parent === clause.id)) continue;
+    if (/^[^,;]+:\s*$/iu.test(clause.text) &&
+        doc.clauses.some((c) => c.parent === clause.id || (c.number && childOf(c.number, clause.number)))) continue;
 
-    // Слишком короткие фрагменты — не функции, а артефакты разметки
-    // (в редакции 8 встречается пустой пункт «5.5.3. ;»).
-    const meaningful = clause.text.replace(/[^а-яёa-z]/giu, '').length > 25;
+    // A short duty can be complete (e.g. «Согласует договоры»). Exclude
+    // punctuation artifacts without an arbitrary minimum sentence length.
+    const meaningful = /[а-яёa-z]{2}/iu.test(clause.text);
 
     if (clause.functionOwner) {
       const unit = units.find((u) => normalizeText(u.name) === normalizeText(parseUnitName(clause.functionOwner).name));
@@ -149,10 +151,13 @@ export function extractFunctions(doc, units) {
     const headerNumber = [...owners.keys()].filter((n) => childOf(clause.number, n)).sort((a, b) => b.length - a.length)[0];
     if (!headerNumber) continue;
     const owner = owners.get(headerNumber);
-    if (!owner || owner.units.length === 0) continue;
+    if (!owner) continue;
     if (!meaningful) continue;
 
-    for (const unit of owner.units) {
+    // The document may name a leadership role without defining a separate unit.
+    // Preserve its duties under that explicit role, without inventing a department.
+    const assigned = owner.units.length ? owner.units : [`Роль: ${owner.title}`];
+    for (const unit of assigned) {
       out.push({
         ref: clause.id,
         number: clause.number,

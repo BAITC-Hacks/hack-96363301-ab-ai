@@ -96,6 +96,13 @@ export interface DocMeta {
   clauses: number
 }
 
+export interface AnalysisQuality {
+  documents: Array<{ docId: string; name: string; clauses: number; units: number; functionClauses: number; ownerBindings: number; unassignedClauses: number }>
+  warnings: Array<{ code: string; title: string; detail: string; evidence: Evidence[] }>
+  checkedReferences: number
+  uniqueSources: number
+}
+
 /** Полный отчёт — то, что отдаёт POST /api/analyze и рисует фронтенд. */
 export interface AnalysisReport {
   meta: {
@@ -110,6 +117,7 @@ export interface AnalysisReport {
   duplicates: Duplicate[]
   conflicts: ConflictOfInterest[]
   gaps: NormativeGap[]
+  quality?: AnalysisQuality
   /** Итоговое аналитическое заключение (must have 5). */
   conclusion: {
     summary: string

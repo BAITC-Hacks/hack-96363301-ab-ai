@@ -89,7 +89,7 @@ export function buildPlan(report, decisions = []) {
   });
   const escalated = checked.filter((d) => d.action === 'escalate').length;
   return {
-    fingerprint: digest({ before: report.meta.before, after: report.meta.after, cases, owners,
+    fingerprint: digest({ before: report.meta.before, after: report.meta.after, cases, owners, coverageWarnings: report.quality?.warnings || [],
       functions: report.functions.map((f) => [f.change, f.ownerBefore, f.ownerAfter, f.evidenceBefore, f.evidenceAfter, f.materialChanges || []]) }),
     cases, owners, decisions: checked,
     stats: { total: cases.length, reviewed: checked.length, pending: cases.length - checked.length,
@@ -116,6 +116,7 @@ export async function exportPlan(report, plan) {
   for (const e of uniqueEvidence([
     ...plan.cases.flatMap((c) => [...c.evidence, ...c.candidates.map((v) => v.evidence)]),
     ...report.functions.flatMap((f) => [...f.evidenceBefore, ...f.evidenceAfter]),
+    ...(report.quality?.warnings || []).flatMap((w) => w.evidence),
   ])) {
     const row = sources.addRow([e.ref, e.docId === 'red8' ? report.meta.before.name : report.meta.after.name, e.number, e.text.slice(0, 32767)]);
     sourceRows.set(e.ref, row.number);
@@ -147,6 +148,24 @@ export async function exportPlan(report, plan) {
     for (const f of material) for (const signal of f.materialChanges) {
       const link = (e) => e ? { text: e.ref, hyperlink: `#'Источники'!A${sourceRows.get(e.ref)}` } : '';
       checks.addRow([signal.title, signal.detail, signal.beforeFragment, signal.afterFragment, `${Math.round(f.similarity * 100)}%`, link(f.evidenceBefore[0]), link(f.evidenceAfter[0])]);
+    }
+  }
+  if (report.quality) {
+    const quality = workbook.addWorksheet('Качество анализа');
+    quality.columns = [{ header: 'Категория', width: 24 }, { header: 'Документ / тип', width: 50 },
+      { header: 'Показатель / вопрос', width: 55 }, { header: 'Значение / пояснение', width: 110 },
+      { header: 'Источники', width: 60 }, { header: 'Открыть источник', width: 28 }];
+    for (const doc of report.quality.documents) {
+      for (const [label, value] of [['Распознано пунктов', doc.clauses], ['Подразделений', doc.units], ['Пунктов с функциями', doc.functionClauses], ['Связей функция–владелец', doc.ownerBindings], ['Пунктов без определённого подразделения', doc.unassignedClauses]])
+        quality.addRow(['Разбор', doc.name, label, value]);
+    }
+    quality.addRow(['Источники', '', 'Проверено вхождений ссылок', report.quality.checkedReferences]);
+    quality.addRow(['Источники', '', 'Уникальных источников', report.quality.uniqueSources]);
+    quality.addRow(['Ограничение', '', 'Границы проверки', 'Количество распознанных пунктов не доказывает полноту анализа. Проверка ссылок подтверждает совпадение с текстом парсера, а не правильность содержательных выводов.']);
+    for (const w of report.quality.warnings) {
+      const refs = w.evidence.map((e) => e.ref);
+      quality.addRow(['Ручная проверка', w.code, w.title, w.detail.slice(0, 32767), refs.join(', '),
+        refs.length ? { text: refs[0], hyperlink: `#'Источники'!A${sourceRows.get(refs[0])}` } : '']);
     }
   }
   workbook.eachSheet((s) => {

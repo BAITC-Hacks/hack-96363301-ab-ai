@@ -4,6 +4,8 @@ import { extractUnits, extractFunctions, diffUnits } from './analysis/units.js';
 import { diffFunctions, findDuplicates, findConflicts, findNormativeGaps } from './analysis/diff.js';
 import { explainChanges, buildConclusion, hasApiKey } from './llm/enrich.js';
 import { AnalysisReport } from './types.js';
+import { buildCoverage } from './analysis/quality.js';
+import { auditReportEvidence } from './analysis/evidence-audit.js';
 
 /**
  * Пайплайн анализа: от пары .docx до готового отчёта.
@@ -65,9 +67,17 @@ export async function analyze({ beforeBuffer, beforeName, afterBuffer, afterName
   const explained = await explainChanges(functions, clauseIndex);
   if (explained.step) trace.push(explained.step);
 
-  const draft = { units, functions: explained.functions, duplicates, conflicts, gaps };
+  const quality = buildCoverage([
+    { doc: before, units: unitsBefore, functions: functionsBefore, name: beforeName },
+    { doc: after, units: unitsAfter, functions: functionsAfter, name: afterName },
+  ]);
+  const draft = { units, functions: explained.functions, duplicates, conflicts, gaps, quality };
   const { conclusion, step } = await buildConclusion(draft);
   trace.push(step);
+
+  const sourceAudit = await timed('Проверка всех цитат отчёта и полноты распознанных блоков', 'deterministic',
+    () => auditReportEvidence({ ...draft, conclusion, meta: { before: { docId: before.docId }, after: { docId: after.docId } } }, clauseIndex));
+  Object.assign(quality, sourceAudit);
 
   const usedLive = trace.some((t) => t.kind === 'llm' && t.source === 'api');
 

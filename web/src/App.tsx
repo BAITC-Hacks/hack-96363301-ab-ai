@@ -11,6 +11,7 @@ import { UnitsSection } from './components/UnitsSection'
 import { UploadPanel } from './components/UploadPanel'
 import { ReportSummary } from './components/ReportSummary'
 import { ReorganizationLab } from './components/ReorganizationLab'
+import { QualityPassport } from './components/QualityPassport'
 
 const NAV = [
   { id: 'reorganization-lab', label: 'План реорганизации' },
@@ -54,7 +55,10 @@ export default function App() {
 
   const report = result?.report ?? null
   useEffect(() => {
-    if (report) document.getElementById('reorganization-lab')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (report) {
+      const target = report.quality?.documents.some((doc) => doc.unassignedClauses > 0) ? 'analysis-quality' : 'reorganization-lab'
+      document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }, [report])
 
   return (
@@ -113,6 +117,7 @@ export default function App() {
           <ModeBanner mode={report.meta.mode} />
           {result.fallback && result.fallbackReason ? <FallbackBanner reason={result.fallbackReason} /> : null}
           <MetaBar meta={report.meta} />
+          {report.quality && <QualityPassport key={report.meta.reportId || report.meta.generatedAt} quality={report.quality} />}
           <ReorganizationLab key={report.meta.reportId || report.meta.generatedAt} report={report} />
           <ReportSummary report={report} />
 

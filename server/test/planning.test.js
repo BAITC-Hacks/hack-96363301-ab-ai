@@ -49,7 +49,7 @@ test('Excel содержит решения, источник, гиперссы�
   const plan = buildPlan(report, [{ ...decision, note: '=HYPERLINK("https://example.invalid", "plain text")' }]);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await exportPlan(report, plan));
-  assert.deepEqual(workbook.worksheets.map((s) => s.name), ['Обзор', 'Источники', 'План решений', 'Сопоставление функций']);
+  assert.deepEqual(workbook.worksheets.map((s) => s.name), ['Обзор', 'Источники', 'План решений', 'Сопоставление функций', 'Качество анализа']);
   const sheet = workbook.getWorksheet('План решений');
   assert.equal(sheet.getCell('E2').text, 'ОА');
   assert.equal(typeof sheet.getCell('F2').value, 'string');

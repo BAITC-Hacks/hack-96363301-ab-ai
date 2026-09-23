@@ -126,8 +126,8 @@
   "negative": [
     {
       "id": "NEG-1",
-      "title": "Сдвиг нумерации не порождает лавины ложных потерь",
-      "check": { "type": "max-count", "collection": "functions", "change": "lost", "max": 6 }
+      "title": "Ненайденные соответствия ограничены семью вручную разобранными пунктами (см. docs/loss-review.md)",
+      "check": { "type": "lost-sources", "refs": ["red8#5.3.3", "red8#5.3.4", "red8#5.3.11", "red8#5.4.10", "red8#5.6.2", "red8#5.6.3", "red8#5.7.2"] }
     },
     {
       "id": "NEG-2",
