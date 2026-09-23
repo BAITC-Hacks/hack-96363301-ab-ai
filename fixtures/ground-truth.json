@@ -1,0 +1,153 @@
+{
+  "$comment": [
+    "Контрольный набор ожиданий по п. 11 ТЗ «Простая проверка решения».",
+    "Составлен ручной сверкой двух редакций положения из data/.",
+    "Положительные ожидания — что агент обязан найти.",
+    "Отрицательные — чего он находить НЕ должен: в редакции 9 сквозная",
+    "перенумерация раздела 5, и наивное сравнение по номерам пунктов выдало бы",
+    "около полутора десятков несуществующих «потерянных функций»."
+  ],
+  "documents": {
+    "before": "data/polozhenie_red8_before.docx",
+    "after": "data/polozhenie_red9_after.docx"
+  },
+  "positive": [
+    {
+      "id": "UNIT-1",
+      "requirement": "must have 1",
+      "title": "Департамент ИТ-аудита и анализа данных (ДИТААД) создан",
+      "check": { "type": "unit", "abbr": "ДИТААД", "status": "created" }
+    },
+    {
+      "id": "UNIT-2",
+      "requirement": "must have 1",
+      "title": "Департамент операционного аудита (ДОА) создан",
+      "check": { "type": "unit", "abbr": "ДОА", "status": "created" }
+    },
+    {
+      "id": "UNIT-3",
+      "requirement": "must have 1",
+      "title": "Департамент непрерывного мониторинга СВК (ДНМ) сохранён",
+      "check": { "type": "unit", "abbr": "ДНМ", "status": "kept" }
+    },
+    {
+      "id": "UNIT-4",
+      "requirement": "must have 1",
+      "title": "Департамент контроля качества аудита и методологии (ДККМ) сохранён",
+      "check": { "type": "unit", "abbr": "ДККМ", "status": "kept" }
+    },
+    {
+      "id": "FUNC-1",
+      "requirement": "must have 2",
+      "title": "Выявление рисков с дублирующим покрытием (Карта гарантий) перешло от ДНМ к ДИТААД и ДОА",
+      "check": {
+        "type": "function",
+        "change": "moved",
+        "refBefore": "red8#5.4.4б",
+        "refAfter": "red9#5.3.3б",
+        "ownerBefore": "ДНМ",
+        "ownerAfter": "ДИТААД, ДОА"
+      }
+    },
+    {
+      "id": "FUNC-2",
+      "requirement": "must have 2",
+      "title": "Использование результатов работы других субъектов СВК перешло от ДНМ к ДИТААД и ДОА",
+      "check": {
+        "type": "function",
+        "change": "moved",
+        "refBefore": "red8#5.4.4а",
+        "refAfter": "red9#5.3.3а",
+        "ownerBefore": "ДНМ",
+        "ownerAfter": "ДИТААД, ДОА"
+      }
+    },
+    {
+      "id": "FUNC-3",
+      "requirement": "must have 2",
+      "title": "Анализ результатов непрерывного аудита перешёл от ДККМ к ДНМ",
+      "check": { "type": "function", "change": "moved", "refBefore": "red8#5.5.4", "ownerBefore": "ДККМ", "ownerAfter": "ДНМ" }
+    },
+    {
+      "id": "FUNC-4",
+      "requirement": "must have 2",
+      "title": "Подготовка предложений в план работ БВА перешла от ДККМ к ДНМ",
+      "check": { "type": "function", "change": "moved", "refBefore": "red8#5.5.10", "ownerBefore": "ДККМ", "ownerAfter": "ДНМ" }
+    },
+    {
+      "id": "DUP-1",
+      "requirement": "must have 3",
+      "title": "Участие в разработке ВНД БВА закреплено более чем за одним подразделением",
+      "check": { "type": "duplicate", "textMatch": "разработке ВНД", "minOwners": 2 }
+    },
+    {
+      "id": "DUP-2",
+      "requirement": "must have 3",
+      "title": "Запрос информации у Руководителей Общества закреплён более чем за одним подразделением",
+      "check": { "type": "duplicate", "textMatch": "запрашива", "minOwners": 2 }
+    },
+    {
+      "id": "DUP-3",
+      "requirement": "must have 3",
+      "title": "Обнаружено не менее пяти групп пересекающегося функционала",
+      "check": { "type": "count", "collection": "duplicates", "min": 5 }
+    },
+    {
+      "id": "COI-1",
+      "requirement": "must have 3",
+      "title": "Выявлены добавленные в редакции 9 требования о декларировании конфликта интересов (п. 4.4а, 4.4б)",
+      "check": { "type": "conflict", "refIncludes": "red9#4.4а" }
+    },
+    {
+      "id": "COI-2",
+      "requirement": "must have 3",
+      "title": "Выявлено совмещение контрольной и планирующей функций у ДККМ",
+      "check": { "type": "conflict", "titleMatch": "ДККМ" }
+    },
+    {
+      "id": "SRC-1",
+      "requirement": "must have 4",
+      "title": "Каждый вывод сопровождается ссылкой на существующий пункт документа, текст цитаты совпадает с исходником",
+      "check": { "type": "citations-valid" }
+    },
+    {
+      "id": "CONC-1",
+      "requirement": "must have 5",
+      "title": "Сформировано итоговое заключение с наблюдениями, рекомендациями и оговоркой о рекомендательном характере",
+      "check": { "type": "conclusion" }
+    },
+    {
+      "id": "GAP-1",
+      "requirement": "сверх ТЗ",
+      "title": "Функции созданных департаментов не закреплены в разделе «Цели, задачи и функции»",
+      "check": { "type": "gap", "mentions": ["ДИТААД", "ДОА"] }
+    }
+  ],
+  "negative": [
+    {
+      "id": "NEG-1",
+      "title": "Сдвиг нумерации не порождает лавины ложных потерь",
+      "check": { "type": "max-count", "collection": "functions", "change": "lost", "max": 6 }
+    },
+    {
+      "id": "NEG-2",
+      "title": "Права директора ДККМ (ред. 8 п. 5.6.4) не помечены как потерянные — они переехали в общий пункт 5.6",
+      "check": { "type": "not-lost", "ref": "red8#5.6.4" }
+    },
+    {
+      "id": "NEG-3",
+      "title": "Права директора ДНМ (ред. 8 п. 5.7.4) не помечены как потерянные",
+      "check": { "type": "not-lost", "ref": "red8#5.7.4" }
+    },
+    {
+      "id": "NEG-4",
+      "title": "Присутствие на заседаниях (ред. 8 п. 5.6.6) не помечено как потерянное",
+      "check": { "type": "not-lost", "ref": "red8#5.6.6" }
+    },
+    {
+      "id": "NEG-5",
+      "title": "Один пункт, закреплённый сразу за двумя подразделениями, не считается дублированием",
+      "check": { "type": "duplicates-distinct-clauses" }
+    }
+  ]
+}
